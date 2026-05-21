@@ -71,3 +71,18 @@ model TaipeiCheckItem {
   order   Int
   event   TaipeiEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
+
+model TaipeiPhotoComment {
+  id        String   @id @default(cuid())
+  photoPath String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+// afterIndex: 0 = before first photo, 1 = after first photo, etc.
+model TaipeiPhotoHeading {
+  id         String @id @default(cuid())
+  dayNum     Int
+  afterIndex Int
+  label      String
+}

@@ -1,9 +1,10 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+
 import { DAYS } from './data';
 import { DAYS2 } from './data2';
 
-const prisma = new PrismaClient();
+
 const ALL_DAYS = [...DAYS, ...DAYS2];
 
 export async function POST() {

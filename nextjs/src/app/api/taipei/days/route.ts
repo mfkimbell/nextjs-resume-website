@@ -1,7 +1,8 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+
+
 
 export async function GET(req: Request) {
   const mode = new URL(req.url).searchParams.get('mode') ?? 'fake';

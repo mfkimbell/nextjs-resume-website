@@ -11,9 +11,9 @@ export default function RingPage() {
       </div>
 
       {/* Full ring photo */}
-      <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5">
-        <div className="relative w-full aspect-square">
-          <Image src="/ring.png" alt="Engagement Ring" fill className="object-contain p-6" />
+      <div className="rounded-2xl overflow-hidden border border-white/10">
+        <div className="relative w-full aspect-[4/3]">
+          <Image src="/ring.png" alt="Engagement Ring" fill className="object-cover" />
         </div>
       </div>
 
@@ -84,6 +84,28 @@ export default function RingPage() {
             <p className="text-white/60 text-sm leading-relaxed">
               Semi mount ring setting for your diamond. 14k Gold petal prong set flower basket setting engagement ring.
             </p>
+            <div className="space-y-2 text-sm">
+              <div className="flex gap-2">
+                <span className="text-white/40 w-28 shrink-0">Type</span>
+                <span className="text-white/80">Semi-Mount</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-white/40 w-28 shrink-0">Ring Size</span>
+                <span className="text-white/80">4.5 US</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-white/40 w-28 shrink-0">Material</span>
+                <span className="text-white/80">Solid 14k Yellow Gold</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-white/40 w-28 shrink-0">Band Width</span>
+                <span className="text-white/80">2.50mm</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-white/40 w-28 shrink-0">Diamond Size</span>
+                <span className="text-white/80">7.12 × 7.16 × 4.42mm</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

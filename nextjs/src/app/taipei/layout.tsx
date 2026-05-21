@@ -59,24 +59,31 @@ function PhotoColumn({ photos, topPad, side, className }: { photos: string[]; to
 }
 
 function PolaroidWall({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isPhotos = pathname === "/taipei/photos";
   const { left, right } = useMemo(() => {
     const shuffled = seededShuffle(ALL_PICS, 42);
     const mid = Math.ceil(shuffled.length / 2);
     return { left: shuffled.slice(0, mid), right: shuffled.slice(mid) };
   }, []);
 
+  const showColumns = pathname !== "/taipei/photos";
+
   return (
     <div className="relative min-h-screen">
-      <PhotoColumn photos={left} topPad={280} side="left" className="hidden xl:flex" />
-      <PhotoColumn photos={[...left, ...right]} topPad={280} side="right" className="flex xl:hidden" />
-      <PhotoColumn photos={right} topPad={280} side="right" className="hidden xl:flex" />
-      {children}
+      {showColumns && <PhotoColumn photos={left} topPad={280} side="left" className="hidden xl:flex" />}
+      {showColumns && <PhotoColumn photos={[...left, ...right]} topPad={280} side="right" className="flex xl:hidden" />}
+      {showColumns && <PhotoColumn photos={right} topPad={280} side="right" className="hidden xl:flex" />}
+      <div className={`mx-auto py-8 ${isPhotos ? "px-2 max-w-none" : "px-4 max-w-5xl"}`}>
+        {children}
+      </div>
     </div>
   );
 }
 
 const NAV = [
   { href: "/taipei", label: "🗓️ Schedule" },
+  { href: "/taipei/photos", label: "📷 Photos" },
   { href: "/taipei/raohe", label: "🏮 Raohe" },
   { href: "/taipei/transit", label: "🚆 Transit Guide" },
   { href: "/taipei/map", label: "🗺️ Map" },
@@ -87,7 +94,7 @@ function TaipeiNav() {
   const { mode } = useMode();
 
   return (
-    <div className="border-b border-white/10 bg-black/30 backdrop-blur-md sticky top-0 z-50">
+    <div className="border-b border-white/10 bg-black/30 backdrop-blur-md">
       <div className="max-w-5xl mx-auto px-4">
         <div className="flex items-center justify-between py-3">
           <div>
@@ -140,7 +147,7 @@ export default function TaipeiLayout({ children }: { children: React.ReactNode }
 
       <TaipeiNav />
       <PolaroidWall>
-        <div className="max-w-5xl mx-auto px-4 py-8">{children}</div>
+        {children}
       </PolaroidWall>
     </ModeProvider>
   );
