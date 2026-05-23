@@ -128,8 +128,87 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   );
 }
 
+// ─── Move to day popup ────────────────────────────────────────────────────────
+function MoveToDayPopup({
+  src,
+  days,
+  currentDayNum,
+  mode,
+  onClose,
+  onMoved,
+}: {
+  src: string;
+  days: TaipeiDay[];
+  currentDayNum: number;
+  mode: "real" | "fake";
+  onClose: () => void;
+  onMoved: (toDayNum: number) => void;
+}) {
+  const [moving, setMoving] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function moveToDay(toDayNum: number) {
+    setMoving(true);
+    await fetch("/api/taipei/photo-move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoPath: src, toDayNum }),
+    });
+    onMoved(toDayNum);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#0d1b26] border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <span className="text-white/80 text-sm font-semibold">What day does this photo belong?</span>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-3 flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto">
+          {days.map((day) => {
+            const isCurrent = day.dayNum === currentDayNum;
+            const imgSrc = dayImg(day.dayNum, mode);
+            return (
+              <button
+                key={day.id}
+                disabled={isCurrent || moving}
+                onClick={() => moveToDay(day.dayNum)}
+                className={`flex items-center gap-3 w-full px-3 py-2 rounded-xl transition-all text-left ${
+                  isCurrent
+                    ? "opacity-40 cursor-default border border-white/10 bg-white/5"
+                    : "border border-white/10 hover:border-sky-400/50 hover:bg-sky-500/10 bg-white/5 cursor-pointer"
+                }`}
+              >
+                <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                  <Image src={imgSrc} alt={day.label} fill className="object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold truncate ${isCurrent ? "text-white/40" : "text-white/80"}`}>
+                    {day.label}
+                    {isCurrent && <span className="ml-2 text-[10px] font-normal text-white/30">current</span>}
+                  </div>
+                  <div className="text-xs text-white/35 truncate">{day.date.split(",")[1]?.trim() || day.date}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Photo tile ───────────────────────────────────────────────────────────────
-function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenComments, onMoveUp, onMoveDown }: {
+function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenComments, onMoveUp, onMoveDown, onMoveToDay }: {
   src: string;
   commentCount: number;
   canMoveUp: boolean;
@@ -138,6 +217,7 @@ function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenCo
   onOpenComments: (e: React.MouseEvent) => void;
   onMoveUp: (e: React.MouseEvent) => void;
   onMoveDown: (e: React.MouseEvent) => void;
+  onMoveToDay: (e: React.MouseEvent) => void;
 }) {
   const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
 
@@ -160,7 +240,7 @@ function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenCo
           }}
         />
 
-        {/* Up/down arrows — top left */}
+        {/* Up/down arrows + move-to-day — top left */}
         <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
           {canMoveUp && (
             <button
@@ -184,6 +264,16 @@ function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenCo
               </svg>
             </button>
           )}
+          <button
+            onClick={onMoveToDay}
+            className="bg-black/60 hover:bg-amber-500/80 text-white rounded-full p-1 transition-colors"
+            title="Move to day…"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v4m0 0l-1.5-1.5M12 15l1.5-1.5" />
+            </svg>
+          </button>
         </div>
 
         {/* Comments + download — top right */}
@@ -223,12 +313,13 @@ function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenCo
 }
 
 // ─── Photos grid ──────────────────────────────────────────────────────────────
-function PhotosGrid({ dayNum }: { dayNum: number }) {
+function PhotosGrid({ dayNum, days, mode }: { dayNum: number; days: TaipeiDay[]; mode: "real" | "fake" }) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [moveToDayFor, setMoveToDayFor] = useState<string | null>(null);
 
   const dragIndexRef = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -311,6 +402,7 @@ function PhotosGrid({ dayNum }: { dayNum: number }) {
               onOpenComments={(e) => { e.stopPropagation(); setCommentsFor(src); }}
               onMoveUp={(e) => move(idx, -1, e)}
               onMoveDown={(e) => move(idx, 1, e)}
+              onMoveToDay={(e) => { e.stopPropagation(); setMoveToDayFor(src); }}
             />
           </div>
         ))}
@@ -322,6 +414,19 @@ function PhotosGrid({ dayNum }: { dayNum: number }) {
           src={commentsFor}
           count={commentCounts[commentsFor] ?? 0}
           onClose={() => setCommentsFor(null)}
+        />
+      )}
+      {moveToDayFor && (
+        <MoveToDayPopup
+          src={moveToDayFor}
+          days={days}
+          currentDayNum={dayNum}
+          mode={mode}
+          onClose={() => setMoveToDayFor(null)}
+          onMoved={() => {
+            setPhotos((prev) => prev.filter((p) => p !== moveToDayFor));
+            setMoveToDayFor(null);
+          }}
         />
       )}
     </>
@@ -376,7 +481,7 @@ export default function PhotosPage() {
         </div>
       )}
 
-      {current && <PhotosGrid dayNum={current.dayNum} />}
+      {current && <PhotosGrid dayNum={current.dayNum} days={days} mode={mode} />}
     </div>
   );
 }

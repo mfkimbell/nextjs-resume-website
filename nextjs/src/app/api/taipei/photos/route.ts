@@ -27,18 +27,34 @@ export async function GET(req: NextRequest) {
   const day = req.nextUrl.searchParams.get("day");
   if (!day) return NextResponse.json([]);
 
+  const dayNum = parseInt(day);
   const defaultPaths = await listGCSDay(day);
 
-  const saved = await prisma.taipeiPhotoOrder.findUnique({ where: { dayNum: parseInt(day) } });
+  // Photos assigned away from this day, and photos assigned into this day
+  const [assignedAway, assignedIn] = await Promise.all([
+    prisma.taipeiPhotoDayAssignment.findMany({ where: { NOT: { toDayNum: dayNum } } }),
+    prisma.taipeiPhotoDayAssignment.findMany({ where: { toDayNum: dayNum } }),
+  ]);
+
+  const assignedAwaySet = new Set(assignedAway.map((a) => a.photoPath));
+  const assignedInPaths = assignedIn.map((a) => a.photoPath);
+
+  // Base list: native day photos minus those moved away, plus those moved in
+  const basePaths = [
+    ...defaultPaths.filter((p) => !assignedAwaySet.has(p)),
+    ...assignedInPaths.filter((p) => !defaultPaths.includes(p)),
+  ];
+
+  const saved = await prisma.taipeiPhotoOrder.findUnique({ where: { dayNum } });
   if (saved) {
     const order: string[] = saved.order as string[];
-    const pathSet = new Set(defaultPaths);
+    const pathSet = new Set(basePaths);
     const ordered = order.filter((p) => pathSet.has(p));
-    const remaining = defaultPaths.filter((p) => !new Set(ordered).has(p));
+    const remaining = basePaths.filter((p) => !new Set(ordered).has(p));
     return NextResponse.json([...ordered, ...remaining]);
   }
 
-  return NextResponse.json(defaultPaths);
+  return NextResponse.json(basePaths);
 }
 
 export async function POST(req: NextRequest) {

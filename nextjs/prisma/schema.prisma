@@ -91,3 +91,9 @@ model TaipeiPhotoOrder {
   dayNum Int    @id
   order  Json
 }
+
+// Tracks photos reassigned from their GCS folder day to a different day
+model TaipeiPhotoDayAssignment {
+  photoPath  String @id
+  toDayNum   Int
+}
