@@ -15,9 +15,8 @@ function dayImg(dayNum: number, mode: "real" | "fake"): string {
 }
 
 interface PhotoComment { id: string; body: string; createdAt: string; }
-interface PhotoHeading { id: string; dayNum: number; afterIndex: number; label: string; }
 
-// ─── Comments panel (separate modal) ────────────────────────────────────────
+// ─── Comments panel ──────────────────────────────────────────────────────────
 function CommentsPanel({ src, count, onClose }: { src: string; count: number; onClose: () => void }) {
   const [comments, setComments] = useState<PhotoComment[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -32,9 +31,7 @@ function CommentsPanel({ src, count, onClose }: { src: string; count: number; on
       .then((d) => { setComments(d); setLoaded(true); });
   }, [src]);
 
-  useEffect(() => {
-    if (composing) textareaRef.current?.focus();
-  }, [composing]);
+  useEffect(() => { if (composing) textareaRef.current?.focus(); }, [composing]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -132,29 +129,21 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
 }
 
 // ─── Photo tile ───────────────────────────────────────────────────────────────
-function PhotoTile({ src, commentCount, onOpen, onOpenComments, onAddHeadingBefore }: {
+function PhotoTile({ src, commentCount, canMoveUp, canMoveDown, onOpen, onOpenComments, onMoveUp, onMoveDown }: {
   src: string;
   commentCount: number;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onOpen: () => void;
   onOpenComments: (e: React.MouseEvent) => void;
-  onAddHeadingBefore: (label: string) => void;
+  onMoveUp: (e: React.MouseEvent) => void;
+  onMoveDown: (e: React.MouseEvent) => void;
 }) {
   const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
-  const [addingHeading, setAddingHeading] = useState(false);
-  const [headingDraft, setHeadingDraft] = useState("");
-  const headingInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (addingHeading) headingInputRef.current?.focus(); }, [addingHeading]);
-
-  function submitHeading() {
-    if (headingDraft.trim()) onAddHeadingBefore(headingDraft.trim());
-    setHeadingDraft("");
-    setAddingHeading(false);
-  }
 
   return (
     <div
-      className="break-inside-avoid mb-2 rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-white/25 transition-all duration-200 cursor-pointer group relative"
+      className="break-inside-avoid mb-2 rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-white/25 transition-all duration-200 cursor-pointer relative group"
       onClick={onOpen}
     >
       <div
@@ -171,17 +160,34 @@ function PhotoTile({ src, commentCount, onOpen, onOpenComments, onAddHeadingBefo
           }}
         />
 
-        {/* Hover overlay buttons */}
+        {/* Up/down arrows — top left */}
+        <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+          {canMoveUp && (
+            <button
+              onClick={onMoveUp}
+              className="bg-black/60 hover:bg-black/90 text-white rounded-full p-1 transition-colors"
+              title="Move up"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          )}
+          {canMoveDown && (
+            <button
+              onClick={onMoveDown}
+              className="bg-black/60 hover:bg-black/90 text-white rounded-full p-1 transition-colors"
+              title="Move down"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Comments + download — top right */}
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-          <button
-            onClick={(e) => { e.stopPropagation(); setAddingHeading(true); }}
-            className="bg-black/60 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors"
-            title="Add heading before this photo"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8m-8 6h16" />
-            </svg>
-          </button>
           <button
             onClick={onOpenComments}
             className="relative bg-black/60 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors"
@@ -203,7 +209,6 @@ function PhotoTile({ src, commentCount, onOpen, onOpenComments, onAddHeadingBefo
           </a>
         </div>
 
-        {/* Persistent comment count badge */}
         {commentCount > 0 && (
           <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -212,140 +217,68 @@ function PhotoTile({ src, commentCount, onOpen, onOpenComments, onAddHeadingBefo
             {commentCount}
           </div>
         )}
-
-        {/* Heading input overlay */}
-        {addingHeading && (
-          <div className="absolute inset-0 bg-black/70 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <div className="flex gap-2 px-3 w-full max-w-[90%]">
-              <input
-                ref={headingInputRef}
-                value={headingDraft}
-                onChange={(e) => setHeadingDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") submitHeading();
-                  if (e.key === "Escape") { setAddingHeading(false); setHeadingDraft(""); }
-                }}
-                onBlur={() => { submitHeading(); }}
-                placeholder="Heading before this photo…"
-                className="flex-1 bg-white/10 border border-sky-400/60 rounded-lg px-3 py-1.5 text-white text-sm outline-none text-center placeholder-white/40"
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
-
-// ─── Heading divider ──────────────────────────────────────────────────────────
-function HeadingDivider({ heading, afterIndex, dayNum, onAdd, onUpdate, onDelete }: {
-  heading: PhotoHeading | undefined;
-  afterIndex: number;
-  dayNum: number;
-  onAdd: (h: PhotoHeading) => void;
-  onUpdate: (h: PhotoHeading) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(heading?.label ?? "");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { setDraft(heading?.label ?? ""); }, [heading]);
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
-  async function save() {
-    setEditing(false);
-    if (!draft.trim()) { if (heading) remove(); return; }
-    if (heading) {
-      const res = await fetch("/api/taipei/photo-headings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: heading.id, label: draft.trim() }) });
-      onUpdate(await res.json());
-    } else {
-      const res = await fetch("/api/taipei/photo-headings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dayNum, afterIndex, label: draft.trim() }) });
-      onAdd(await res.json());
-    }
-  }
-
-  async function remove() {
-    if (!heading) return;
-    setEditing(false);
-    await fetch("/api/taipei/photo-headings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: heading.id }) });
-    onDelete(heading.id);
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-2 py-3 my-1">
-        <div className="flex-1 h-px bg-white/10" />
-        <input ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setDraft(heading?.label ?? ""); } }}
-          placeholder="Section heading…"
-          className="bg-white/10 border border-sky-400/60 rounded px-3 py-1 text-white text-sm outline-none w-48 text-center"
-        />
-        {heading && <button onClick={remove} className="text-white/30 hover:text-red-400 text-xs transition-colors">remove</button>}
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
-    );
-  }
-
-  if (heading) {
-    return (
-      <div className="flex items-center gap-4 py-3 my-1 group cursor-pointer" onClick={() => { setDraft(heading.label); setEditing(true); }}
-        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-        <div className="flex-1 h-px bg-white/15" />
-        <span className="text-white/70 text-sm font-semibold tracking-wide shrink-0 group-hover:text-white transition-colors">
-          {heading.label}{hovered && <span className="ml-2 text-white/30 text-xs font-normal">edit</span>}
-        </span>
-        <div className="flex-1 h-px bg-white/15" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3 py-2 my-0.5 cursor-pointer"
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      onClick={() => { setDraft(""); setEditing(true); }}>
-      <div className={`flex-1 h-px transition-colors ${hovered ? "bg-white/20" : "bg-transparent"}`} />
-      <span className={`text-xs transition-all shrink-0 ${hovered ? "text-white/40" : "text-transparent select-none"}`}>+ add heading</span>
-      <div className={`flex-1 h-px transition-colors ${hovered ? "bg-white/20" : "bg-transparent"}`} />
-    </div>
-  );
-}
-
 
 // ─── Photos grid ──────────────────────────────────────────────────────────────
 function PhotosGrid({ dayNum }: { dayNum: number }) {
   const [photos, setPhotos] = useState<string[]>([]);
-  const [headings, setHeadings] = useState<PhotoHeading[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
   useEffect(() => {
     setLoaded(false);
-    Promise.all([
-      fetch(`/api/taipei/photos?day=${dayNum}`).then((r) => r.json()),
-      fetch(`/api/taipei/photo-headings?day=${dayNum}`).then((r) => r.json()),
-    ]).then(([p, h]: [string[], PhotoHeading[]]) => {
-      setPhotos(p);
-      setHeadings(h);
-      setLoaded(true);
-      // Fetch comment counts for all photos
-      Promise.all(p.map((src: string) =>
-        fetch(`/api/taipei/photo-comments?path=${encodeURIComponent(src)}`).then((r) => r.json()).then((cs: PhotoComment[]) => [src, cs.length] as [string, number])
-      )).then((pairs) => {
-        setCommentCounts(Object.fromEntries(pairs));
+    fetch(`/api/taipei/photos?day=${dayNum}`)
+      .then((r) => r.json())
+      .then((p: string[]) => {
+        setPhotos(p);
+        setLoaded(true);
+        Promise.all(p.map((src: string) =>
+          fetch(`/api/taipei/photo-comments?path=${encodeURIComponent(src)}`).then((r) => r.json()).then((cs: PhotoComment[]) => [src, cs.length] as [string, number])
+        )).then((pairs) => setCommentCounts(Object.fromEntries(pairs)));
       });
+  }, [dayNum]);
+
+  const saveOrder = useCallback(async (newOrder: string[]) => {
+    await fetch("/api/taipei/photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dayNum, order: newOrder }),
     });
   }, [dayNum]);
 
-  const headingAt = useCallback((idx: number) => headings.find((h) => h.afterIndex === idx), [headings]);
+  function move(idx: number, delta: -1 | 1, e: React.MouseEvent) {
+    e.stopPropagation();
+    const to = idx + delta;
+    if (to < 0 || to >= photos.length) return;
+    const next = [...photos];
+    [next[idx], next[to]] = [next[to], next[idx]];
+    setPhotos(next);
+    saveOrder(next);
+  }
 
-  function handleAdd(h: PhotoHeading) { setHeadings((prev) => [...prev, h].sort((a, b) => a.afterIndex - b.afterIndex)); }
-  function handleUpdate(h: PhotoHeading) { setHeadings((prev) => prev.map((x) => (x.id === h.id ? h : x))); }
-  function handleDelete(id: string) { setHeadings((prev) => prev.filter((x) => x.id !== id)); }
+  function onDragStart(idx: number) { dragIndexRef.current = idx; }
+  function onDragEnter(idx: number) { setDragOver(idx); }
+  function onDragEnd() {
+    const from = dragIndexRef.current;
+    const to = dragOver;
+    if (from !== null && to !== null && from !== to) {
+      const next = [...photos];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      setPhotos(next);
+      saveOrder(next);
+    }
+    dragIndexRef.current = null;
+    setDragOver(null);
+  }
 
   if (!loaded) return null;
   if (photos.length === 0) {
@@ -356,60 +289,32 @@ function PhotosGrid({ dayNum }: { dayNum: number }) {
     );
   }
 
-  const dividerProps = { dayNum, onAdd: handleAdd, onUpdate: handleUpdate, onDelete: handleDelete };
-
-  // Build sections split by headings
-  type Section = { startAfter: number; photos: string[] };
-  const sections: Section[] = [];
-  let sec: Section = { startAfter: 0, photos: [] };
-  for (let i = 0; i < photos.length; i++) {
-    sec.photos.push(photos[i]);
-    if (headingAt(i + 1) && i < photos.length - 1) {
-      sections.push(sec);
-      sec = { startAfter: i + 1, photos: [] };
-    }
-  }
-  sections.push(sec);
-
   return (
     <>
-      <HeadingDivider heading={headingAt(0)} afterIndex={0} {...dividerProps} />
-
-      {sections.map((section, si) => (
-        <div key={section.startAfter}>
-          <div className="columns-2 sm:columns-3 md:columns-4 gap-2 mb-2">
-            {section.photos.map((src, localIdx) => {
-              const globalIdx = section.startAfter + localIdx;
-              return (
-                <PhotoTile
-                  key={src}
-                  src={src}
-                  commentCount={commentCounts[src] ?? 0}
-                  onOpen={() => setLightbox(src)}
-                  onOpenComments={(e) => { e.stopPropagation(); setCommentsFor(src); }}
-                  onAddHeadingBefore={async (label) => {
-                    const res = await fetch("/api/taipei/photo-headings", {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ dayNum, afterIndex: globalIdx, label }),
-                    });
-                    handleAdd(await res.json());
-                  }}
-                />
-              );
-            })}
-          </div>
-
-          {si < sections.length - 1 && (
-            <HeadingDivider
-              heading={headingAt(section.startAfter + section.photos.length)}
-              afterIndex={section.startAfter + section.photos.length}
-              {...dividerProps}
+      <div className="columns-2 sm:columns-3 md:columns-4 gap-2">
+        {photos.map((src, idx) => (
+          <div
+            key={src}
+            draggable
+            onDragStart={() => onDragStart(idx)}
+            onDragEnter={() => onDragEnter(idx)}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnd={onDragEnd}
+            className={`transition-opacity ${dragOver === idx && dragIndexRef.current !== idx ? "opacity-40" : "opacity-100"}`}
+          >
+            <PhotoTile
+              src={src}
+              commentCount={commentCounts[src] ?? 0}
+              canMoveUp={idx > 0}
+              canMoveDown={idx < photos.length - 1}
+              onOpen={() => setLightbox(src)}
+              onOpenComments={(e) => { e.stopPropagation(); setCommentsFor(src); }}
+              onMoveUp={(e) => move(idx, -1, e)}
+              onMoveDown={(e) => move(idx, 1, e)}
             />
-          )}
-        </div>
-      ))}
-
-      <HeadingDivider heading={headingAt(photos.length)} afterIndex={photos.length} {...dividerProps} />
+          </div>
+        ))}
+      </div>
 
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
       {commentsFor && (

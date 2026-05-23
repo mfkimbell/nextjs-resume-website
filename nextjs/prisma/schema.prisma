@@ -86,3 +86,8 @@ model TaipeiPhotoHeading {
   afterIndex Int
   label      String
 }
+
+model TaipeiPhotoOrder {
+  dayNum Int    @id
+  order  Json
+}
