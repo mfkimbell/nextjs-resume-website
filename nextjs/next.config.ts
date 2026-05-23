@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingExcludes: {
+    "/api/taipei/photos": ["./public/taipei/**/*"],
+  },
 };
 
 export default nextConfig;
