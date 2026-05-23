@@ -17,7 +17,7 @@ function dayImg(dayNum: number, mode: "real" | "fake"): string {
 interface PhotoComment { id: string; body: string; createdAt: string; }
 
 // ─── Comments panel ──────────────────────────────────────────────────────────
-function CommentsPanel({ src, count, onClose }: { src: string; count: number; onClose: () => void }) {
+function CommentsPanel({ src, onClose }: { src: string; count: number; onClose: () => void }) {
   const [comments, setComments] = useState<PhotoComment[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [composing, setComposing] = useState(false);

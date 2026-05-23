@@ -195,6 +195,7 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
   };
 
   /* ---------- drawing ---------- */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   function redraw() {
     const ctx = ctxRef.current, cvs = canvasRef.current;
     if (!ctx || !cvs) return;
