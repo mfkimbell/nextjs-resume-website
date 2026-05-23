@@ -118,7 +118,7 @@ export default function RightBirdGLB({ containerRef }: RightBirdGLBProps) {
       window.removeEventListener("scroll", onScrollResize);
       window.removeEventListener("resize", onScrollResize);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── animation ─── */
   useFrame(() => {
