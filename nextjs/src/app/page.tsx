@@ -11,6 +11,8 @@ import Metrics from "@/components/Metrics";
 import ProjectsSection from "@/components/Projects";
 import ExperienceSection from "@/components/Experience";
 import SkyBackground from "@/components/SkyBackground";
+import TalkToTheBirds from "@/components/TalkToTheBirds";
+import ForestFrame from "@/components/ForestFrame";
 
 import WebsiteMetricsTracker from "@/components/WebsiteMetricsTracker";
 
@@ -52,11 +54,16 @@ export default function Home() {
 
       {/* clouds */}
       <SkyBackground />
+
+      {/* trees down both edges + leaves across the top */}
+      <ForestFrame />
+
       <Header />
 
       {/* main content — no need to reapply gradient here */}
       <main className="relative z-10 text-white">
         <AirplaneTracking />
+        <TalkToTheBirds />
         <SkillsCarousel />
         <LeftBird />
         <ProjectsSection />

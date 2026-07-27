@@ -1,10 +1,11 @@
 // BirdGLB.tsx
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
+import { LEFT_BIRD } from "@/config/animals";
 
 interface Props {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -12,10 +13,28 @@ interface Props {
 
 interface GLTFResult {
   scene: THREE.Group;
+  animations: THREE.AnimationClip[];
 }
 
 export default function BirdGLB({ containerRef }: Props) {
-  const { scene } = useGLTF("/models/Bird.glb") as GLTFResult;
+  const { scene, animations } = useGLTF("/models/Bird.glb") as GLTFResult;
+
+  // The baked clip also carries "hold" tracks on Head/Body left over from the
+  // Blender export. Strip those out so only the LowerBeak track plays —
+  // otherwise the mixer fights the mouse-tracking rotation every frame.
+  const beakOnlyClips = useMemo(
+    () =>
+      animations.map(
+        (clip) =>
+          new THREE.AnimationClip(
+            clip.name,
+            clip.duration,
+            clip.tracks.filter((t) => t.name.startsWith("LowerBeak"))
+          )
+      ),
+    [animations]
+  );
+  const { actions } = useAnimations(beakOnlyClips, scene);
   const head = useRef<THREE.Object3D>(null!);
 
   /* --------------------------------------------------
@@ -29,26 +48,23 @@ export default function BirdGLB({ containerRef }: Props) {
 
   /* --------------------------------------------------
      TUNEABLE "KNOBS"
-     Adjust these to control behavior
+     All values now live in src/config/animals.ts
   -------------------------------------------------- */
-  // Base (starting) head orientation
-  const BASE_PITCH = 0.3; // + looks up,  − looks down
-  const BASE_YAW = -.8; // + looks right, − looks left
-  const BASE_ROLL = 0.0; // + tilt right ear down, − left ear down
-
-  // Maximum rotation delta driven by pointer
-  const MAX_PITCH_DELTA = 1.2;
-  const MAX_YAW_DELTA = 0.8;
-  const MAX_ROLL_DELTA = 0.2;
-
-  // Responsiveness
-  const DEAD_ZONE = 0.05; // fraction of half-width before head starts turning
-  const SENSITIVITY = 2.0; // scales pointer→rotation
-  const INVERT_X = 1; // 1 = normal, −1 flips horizontal mapping
-  const INVERT_Y = -1; // 1 = normal, −1 flips vertical mapping
-  const CENTER_OFFSET_X = .8; // fraction of half-width to shift pointer origin rightwards
-  const CENTER_OFFSET_Y = .25; // fraction of half-height to shift pointer origin (+ = shift down, - = shift up)
-  const SMOOTHING = 0.1; // interpolation factor for smooth motion
+  const {
+    BASE_PITCH,
+    BASE_YAW,
+    BASE_ROLL,
+    MAX_PITCH_DELTA,
+    MAX_YAW_DELTA,
+    MAX_ROLL_DELTA,
+    DEAD_ZONE,
+    SENSITIVITY,
+    INVERT_X,
+    INVERT_Y,
+    CENTER_OFFSET_X,
+    CENTER_OFFSET_Y,
+    SMOOTHING,
+  } = LEFT_BIRD;
 
 
 
@@ -59,6 +75,20 @@ export default function BirdGLB({ containerRef }: Props) {
     head.current = scene.getObjectByName("Head")!;
     head.current.rotation.set(BASE_PITCH, BASE_YAW, BASE_ROLL);
   }, [scene, BASE_YAW]);
+
+  /* play the baked beak-talk animation on an endless loop */
+  useEffect(() => {
+    const clipName = actions["BeakTalkLoop"] ? "BeakTalkLoop" : Object.keys(actions)[0];
+    const talkAction = clipName ? actions[clipName] : null;
+    if (!talkAction) {
+      console.warn("[BirdGLB] no beak-talk animation found on Bird.glb");
+      return;
+    }
+    talkAction.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    return () => {
+      talkAction.stop();
+    };
+  }, [actions]);
 
   /* pointer tracking with pixel-based dead zone and center offset */
   useEffect(() => {

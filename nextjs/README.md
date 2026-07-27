@@ -20,6 +20,29 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Talk to the Toucans local voice setup
+
+The portfolio frontend uses Twilio Voice SDK for browser microphone calls.
+Copy `.env.example` to `.env` and fill in the Twilio values:
+
+```env
+TWILIO_ACCOUNT_SID=...
+TWILIO_API_KEY=...
+TWILIO_API_KEY_SECRET=...
+TWILIO_TWIML_APP_SID=...
+TWILIO_SYNC_SERVICE_SID=... # optional, needed for transcript/event logs
+TOUCAN_AGENT_NGROK_URL=your-static-domain.ngrok-free.app
+NEXT_PUBLIC_TOUCAN_AGENT_NGROK_URL=https://your-static-domain.ngrok-free.app
+```
+
+For local ConversationRelay testing, run the agent backend separately, expose it with ngrok, and point the Twilio TwiML App Voice Request URL to:
+
+```txt
+https://<TOUCAN_AGENT_NGROK_URL>/call
+```
+
+Then run this Next.js app and use the **Talk to the Toucans** button. Call state and Sync transcript events are logged in the browser console.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -1,13 +1,15 @@
 // components/RightBirdGLB.tsx
 "use client";
 
-import React, { useEffect, useRef, RefObject } from "react";
+import React, { useEffect, useMemo, useRef, RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF, useHelper } from "@react-three/drei";
+import { useGLTF, useHelper, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
+import { RIGHT_BIRD } from "@/config/animals";
 
 interface GLTFResult {
   scene: THREE.Group;
+  animations: THREE.AnimationClip[];
 }
 
 interface RightBirdGLBProps {
@@ -16,7 +18,24 @@ interface RightBirdGLBProps {
 
 export default function RightBirdGLB({ containerRef }: RightBirdGLBProps) {
   /* ─── load model ─── */
-  const { scene } = useGLTF("/models/RightBird.glb") as GLTFResult;
+  const { scene, animations } = useGLTF("/models/RightBird.glb") as GLTFResult;
+
+  // Strip the leftover Head/Body "hold" tracks baked into the clip so only
+  // the LowerBeak track plays — otherwise the mixer fights the mouse-tracking
+  // rotation every frame.
+  const beakOnlyClips = useMemo(
+    () =>
+      animations.map(
+        (clip) =>
+          new THREE.AnimationClip(
+            clip.name,
+            clip.duration,
+            clip.tracks.filter((t) => t.name.startsWith("LowerBeak"))
+          )
+      ),
+    [animations]
+  );
+  const { actions } = useAnimations(beakOnlyClips, scene);
 
   /* ─── refs ─── */
   const sceneRef = useRef<THREE.Object3D>(null!);
@@ -28,25 +47,22 @@ export default function RightBirdGLB({ containerRef }: RightBirdGLBProps) {
   /* ─── pointer state ─── */
   const cursor = useRef({ x: 0, y: 0 });        // –1 … 1
   const lastMousePos = useRef({ x: 0, y: 0 });  // store mouse position for scroll updates
-  const DECAY = 0.12;                          // smoothing factor
 
-  /* ─── constants ─── */
-  const BASE_PITCH = 0.3;                     // slight "curious" tilt
-  const BASE_YAW = -1;                       // faces left on load
-
-  // Absolute limits for yaw (left/right rotation)
-  const YAW_LIMIT_LEFT = -1.5;            // leftmost position (more negative = further left)
-  const YAW_LIMIT_RIGHT = 0.8;            // rightmost position
-
-  // Absolute limits for pitch (up/down rotation)  
-  const PITCH_LIMIT_UP = 1.2;             // highest position
-  const PITCH_LIMIT_DOWN = -.2;          // lowest position
-
-  const MAX_ROLL = -0;                     // subtle roll
-  const YAW_OFFSET = 0;                    // adjust center point of yaw
-  const PITCH_OFFSET = -.1;                // adjust center point of pitch
-  const PITCH_SENSITIVITY = 3.2;          // multiplier for up-down reactivity
-  const MOUSE_X_OFFSET = 0.3;              // shift mouse X position to align bird gaze (+ = shift right, - = shift left)
+  /* ─── constants — all values live in src/config/animals.ts ─── */
+  const {
+    DECAY,
+    BASE_PITCH,
+    BASE_YAW,
+    YAW_LIMIT_LEFT,
+    YAW_LIMIT_RIGHT,
+    PITCH_LIMIT_UP,
+    PITCH_LIMIT_DOWN,
+    MAX_ROLL,
+    YAW_OFFSET,
+    PITCH_OFFSET,
+    PITCH_SENSITIVITY,
+    MOUSE_X_OFFSET,
+  } = RIGHT_BIRD;
 
   /* ─── find head bone ─── */
   useEffect(() => {
@@ -58,6 +74,20 @@ export default function RightBirdGLB({ containerRef }: RightBirdGLBProps) {
       console.error("[RightBirdGLB] Head bone not found");
     }
   }, [scene, BASE_PITCH, BASE_YAW]);
+
+  /* ─── play the baked beak-talk animation on an endless loop ─── */
+  useEffect(() => {
+    const clipName = actions["BeakTalkLoopRight"] ? "BeakTalkLoopRight" : Object.keys(actions)[0];
+    const talkAction = clipName ? actions[clipName] : null;
+    if (!talkAction) {
+      console.warn("[RightBirdGLB] no beak-talk animation found on RightBird.glb");
+      return;
+    }
+    talkAction.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    return () => {
+      talkAction.stop();
+    };
+  }, [actions]);
 
   /* ─── cursor listener (viewport-wide) ─── */
   useEffect(() => {
