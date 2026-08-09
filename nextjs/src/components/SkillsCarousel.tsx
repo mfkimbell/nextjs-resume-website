@@ -80,7 +80,7 @@ export default function SkillsCarousel() {
   }, []);
 
   return (
-    <section id="skills" className="relative py-16 z-10 overflow-visible">
+    <section id="skills" className="relative py-14 z-10 overflow-visible">
       {/* Mobile Clouds (< 768px) */}
       <Image
         src="/clouds/cloud1.png"
@@ -165,7 +165,7 @@ export default function SkillsCarousel() {
 
       <div className="max-w-6xl mx-auto px-4 relative z-20">
         <h2
-          className="text-4xl sm:text-4xl font-bold neon-text mb-12 text-center pb-15"
+          className="text-4xl sm:text-4xl font-bold neon-text mb-8 text-center"
         >
           {hovered ?? "Skills"}
         </h2>

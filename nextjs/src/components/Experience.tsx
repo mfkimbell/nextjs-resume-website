@@ -45,7 +45,7 @@ export default function Experience() {
   return (
     <section
       id="experience"
-      className="overflow-x-hidden py-0 text-white relative"
+      className="overflow-x-hidden py-10 sm:py-14 text-white relative"
     >
       {/* Mobile Clouds (< 768px) */}
       <Image
@@ -141,7 +141,7 @@ export default function Experience() {
         }
       />
 
-      <h2 className="text-center text-4xl font-bold neon-text mb-12">
+      <h2 className="text-center text-4xl font-bold neon-text mb-8">
         Experience
       </h2>
 
@@ -153,7 +153,7 @@ export default function Experience() {
             px-4 md:pl-[${BADGE_FULL_PX + GAP_PX}px] md:pr-4
           `}
         >
-          <ul className="space-y-14">
+          <ul className="space-y-10">
             {roles.map((role: Role, idx: number) => (
               <li
                 key={`${role.company}-${role.dates}-${idx}`}
@@ -186,27 +186,27 @@ export default function Experience() {
 
                 <article className="relative flex-1 bg-black/10 backdrop-blur-md rounded-xl px-6 py-4 w-full sm:pl-[96px]">
                   <header className="mb-2">
-                    {/* Mobile header: title, then company, then date */}
-                    <div className="block sm:hidden ">
-                      <h3 className="font-semibold text-lg leading-tight">
+                    {/* Mobile header: title, then company · date */}
+                    <div className="block sm:hidden">
+                      <h3 className="font-semibold text-lg leading-tight pr-14">
                         {role.title}
                       </h3>
                       <p className="text-sm text-gray-300 mt-1">
                         @ {role.company}
-                      </p>
-                      <p className="text-xs text-blue-200/80 mt-1">
-                        {role.dates}
+                        <span className="ml-2 text-xs text-blue-200/80">
+                          {role.dates}
+                        </span>
                       </p>
                     </div>
-                    {/* Desktop header: title & company inline, date below */}
-                    <div className="hidden sm:block">
+                    {/* Desktop header: title @ company on left, dates on right */}
+                    <div className="hidden sm:flex sm:items-baseline sm:justify-between sm:gap-4">
                       <h3 className="font-semibold text-lg leading-tight">
                         {role.title}
                         <span className="ml-1 text-sm text-gray-300">
                           @ {role.company}
                         </span>
                       </h3>
-                      <p className="text-xs text-blue-200/80 mt-1">
+                      <p className="text-xs text-blue-200/80 whitespace-nowrap">
                         {role.dates}
                       </p>
                     </div>

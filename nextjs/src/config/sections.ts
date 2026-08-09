@@ -19,6 +19,12 @@ export const sectionConfigs: SectionConfig[] = [
     headingSizeMobile: 'text-xl',
   },
   {
+    id: 'talk-to-the-birds',
+    offset: -20,
+    headingSize: 'text-4xl',
+    headingSizeMobile: 'text-2xl',
+  },
+  {
     id: 'projects',
     offset: -90,
     headingSize: 'text-3xl',

@@ -43,7 +43,8 @@ useGLTF.preload(CONFIG.modelPath);
 export default function AirplaneGLB() {
   const planeRef = useRef<THREE.Group>(null);
   const exitMode = useRef(false);
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
+  const pointer = useRef(new THREE.Vector2(-1.4, 0));
   const { scene: airplane } = useGLTF(CONFIG.modelPath);
 
   // CLEANUP: dispose geometries & materials on unmount
@@ -83,6 +84,21 @@ export default function AirplaneGLB() {
     }
   }, [airplane]);
 
+  useEffect(() => {
+    const updatePointer = (event: PointerEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      pointer.current.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -(((event.clientY - rect.top) / rect.height) * 2 - 1)
+      );
+    };
+
+    window.addEventListener("pointermove", updatePointer, { passive: true });
+    return () => window.removeEventListener("pointermove", updatePointer);
+  }, [gl]);
+
   /* ───── HELPERS ───── */
   const target    = useMemo(() => new THREE.Vector3(), []);
   const tmpMat    = useMemo(() => new THREE.Matrix4(), []);
@@ -95,7 +111,7 @@ export default function AirplaneGLB() {
 
   useFrame((state, delta) => {
     if (!planeRef.current) return;
-    const { x: mx, y: my } = state.pointer;
+    const { x: mx, y: my } = pointer.current;
 
     /* ---- exit / comeback ---- */
     if (!exitMode.current && my < CONFIG.exitThreshold) {

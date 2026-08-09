@@ -4,12 +4,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as mutateGlobal } from "swr";
 import { Eraser, Save, Trash2, RotateCcw } from "lucide-react";
+import { SIGN_CONFIG } from "@/config/signs";
 
 /* ---------- types & constants ---------- */
 type Point = { x: number; y: number };
-type Stroke = { pts: Point[]; color: string; width: number; erase?: boolean };
+type Stroke = { pts: Point[]; color: string; width: number; erase?: boolean; submissionId?: string };
 
 // Add history state type
 type CanvasState = {
@@ -28,10 +29,11 @@ interface CanvasBoardProps {
   visits: number;
   clicks: number;
   mouseMiles: number;
+  embedded?: boolean;
 }
 
 /* ================================================================= */
-export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardProps) {
+export default function CanvasBoard({ visits, clicks, mouseMiles, embedded = false }: CanvasBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const { data, mutate } = useSWR<{ strokes: Stroke[] }>("/api/drawings", fetcher, { refreshInterval: 3000 });
@@ -41,6 +43,11 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
   const [color, setColor] = useState(COLORS[1]);
   const [size, setSize] = useState(6);
   const [eraser, setEraser] = useState(false);
+  const [author, setAuthor] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedModal, setSavedModal] = useState<{ author: string } | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // Add history state
   const [history, setHistory] = useState<CanvasState[]>([]);
@@ -75,9 +82,10 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
 
     const setup = () => {
       const w = cvs.clientWidth;
+      const h = cvs.clientHeight;
       const dpr = window.devicePixelRatio || 1;
       cvs.width = w * dpr;
-      cvs.height = w * dpr;
+      cvs.height = h * dpr;
       ctx.resetTransform();
       ctx.scale(dpr, dpr);
       ctx.lineCap = ctx.lineJoin = "round";
@@ -141,17 +149,66 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
 
   /* ---------- actions ---------- */
   const save = async () => {
-    if (!pending.length) return;
+    const cleanAuthor = author.trim().replace(/\s+/g, " ");
+    if (!pending.length || saving) return;
+
+    if (!cleanAuthor) {
+      setSaveError("Add your name before saving.");
+      return;
+    }
+
+    // The existing API column is `name`; it now stores the drawing author's name.
+    const name = cleanAuthor;
 
     // Save current state before making changes
     saveToHistory('save');
+    setSaving(true);
+    setSaveError(null);
 
-    await fetch("/api/drawings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newStrokes: pending }),
-    });
-    setPending([]); mutate();
+    const strokesToSave = pending;
+    const canvasSize = Math.round(canvasRef.current?.clientWidth || SIGN_CONFIG.canvasWidth);
+    const canvasHeight = Math.round(canvasRef.current?.clientHeight || SIGN_CONFIG.canvasHeight);
+
+    try {
+      const galleryResponse = await fetch("/api/drawing-submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, strokes: strokesToSave, canvasSize, canvasHeight }),
+      });
+
+      const galleryBody = await galleryResponse.json().catch(() => null);
+
+      if (!galleryResponse.ok) {
+        throw new Error(galleryBody?.error || "Could not upload drawing.");
+      }
+
+      const submissionId = galleryBody?.drawing?.id;
+      const boardStrokes = submissionId
+        ? strokesToSave.map((stroke) => ({ ...stroke, submissionId }))
+        : strokesToSave;
+
+      const boardResponse = await fetch("/api/drawings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newStrokes: boardStrokes }),
+      });
+
+      if (!boardResponse.ok) {
+        const body = await boardResponse.json().catch(() => null);
+        throw new Error(body?.error || "Could not save drawing to the shared canvas.");
+      }
+
+      setPending([]);
+      setSavedModal({ author: cleanAuthor });
+      setAuthor("");
+      setShowSaveDialog(false);
+      mutate();
+      mutateGlobal("/api/drawing-submissions");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save drawing.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const clearAll = async () => {
@@ -223,7 +280,18 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
           <Eraser size={16} className="text-white" />
         </button>
         <button title="Undo" onClick={undo} className="p-2 ml-0.5 bg-yellow-500 hover:bg-yellow-600 rounded-full text-white"><RotateCcw size={16} /></button>
-        <button title="Save" onClick={save} className="p-2 ml-0.5 bg-blue-500   hover:bg-blue-600   rounded-full text-white"><Save size={16} /></button>
+        <button
+          title="Save"
+          onClick={() => {
+            if (!pending.length || saving) return;
+            setSaveError(null);
+            setShowSaveDialog(true);
+          }}
+          disabled={saving || !pending.length}
+          className="p-2 ml-0.5 bg-blue-500 hover:bg-blue-600 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Save size={16} />
+        </button>
         <button title="Clear" onClick={clearAll} className="p-2 ml-0.5 bg-red-500    hover:bg-red-600    rounded-full text-white"><Trash2 size={16} /></button>
       </div>
     </div>
@@ -274,21 +342,25 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
   /*                              render                               */
   /* ================================================================= */
   return (
-    <div className="flex justify-center w-full mb-3" style={{ touchAction: 'pan-y' }}>
+    <div className={embedded ? "h-full w-full" : "w-full mb-3"} style={{ touchAction: embedded ? 'none' : 'pan-y' }}>
       {/* Use props in a minimal way to satisfy linter */}
       <div style={{ display: 'none' }}>
         {visits && null}
         {clicks && null}
         {mouseMiles && null}
       </div>
-      {/* ------------- card + sidebar wrapper ------------- */}
-      <div className="relative" style={{ touchAction: 'none' }}> {/* relative only hugs the card */}
+      <div className={embedded ? "h-full w-full" : "flex justify-center w-full"}>
+        {/* ------------- card + sidebar wrapper ------------- */}
+        <div className={embedded ? "relative h-full w-full" : "relative"} style={{ touchAction: 'none' }}> {/* relative only hugs the card */}
         {/* === Drawing card === */}
         <div
-          className="w-full max-w-[24rem] p-4 mx-auto
-                     bg-white/10 backdrop-blur-lg shadow-lg border border-white/20
-                     rounded-xl flex flex-col gap-4 mb-0"
+          className={
+            embedded
+              ? "h-full w-full mx-auto rounded-lg flex flex-col justify-center gap-2 mb-0"
+              : "w-full p-4 mx-auto bg-white/10 backdrop-blur-lg shadow-lg border border-white/20 rounded-xl flex flex-col gap-4 mb-0"
+          }
           style={{
+            maxWidth: embedded ? '100%' : `${SIGN_CONFIG.canvasWidth + 32}px`,
             touchAction: 'none',
             overflowX: 'hidden',
             overflowY: 'hidden'
@@ -301,9 +373,10 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
               WebkitUserSelect: 'none',
               WebkitTouchCallout: 'none',
               overscrollBehavior: 'none',
-              position: 'relative'
+              position: 'relative',
+              aspectRatio: `${SIGN_CONFIG.canvasWidth} / ${SIGN_CONFIG.canvasHeight}`,
             } as React.CSSProperties}
-            className="w-full aspect-square bg-transparent rounded-md border-2 border-white"
+            className={embedded ? "w-full bg-transparent rounded-md border-2 border-amber-900/35" : "w-full bg-transparent rounded-md border-2 border-white"}
             onPointerDown={start}
             onPointerMove={move}
             onPointerUp={end}
@@ -314,7 +387,7 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
           />
           <div
             id="ios-controls"
-            className="sm:hidden flex flex-col items-center gap-4"
+            className={embedded ? "flex flex-col items-center gap-2" : "sm:hidden flex flex-col items-center gap-4"}
             style={{ touchAction: 'manipulation' }}
           >
             {Palette}
@@ -327,15 +400,115 @@ export default function CanvasBoard({ visits, clicks, mouseMiles }: CanvasBoardP
         {/* === Sidebar === */}
         <div
           id="sidebar"
-          className="hidden sm:flex flex-col gap-4 w-58
-                     absolute left-full ml-6 top-0">
+          className={embedded ? "hidden" : "hidden sm:flex flex-col gap-4 w-58 absolute left-full ml-6 top-0"}>
           <div className="p-2 bg-white/20 rounded">{Tools}</div>
           <div className="p-2 bg-white/20 rounded">
             {Palette}
             {Slider}
           </div>
         </div>
+        </div>
       </div>
+
+      {showSaveDialog && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="doodle-save-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => {
+            if (!saving) {
+              setShowSaveDialog(false);
+              setSaveError(null);
+            }
+          }}
+        >
+          <form
+            className="w-full max-w-sm rounded-xl bg-white p-6 text-gray-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
+            }}
+          >
+            <h2 id="doodle-save-title" className="text-lg font-semibold">
+              Sign your doodle
+            </h2>
+            <div className="mt-4 flex flex-col gap-3">
+              <div>
+                <label htmlFor="drawing-author" className="mb-1 block text-sm font-medium text-gray-800">
+                  Author
+                </label>
+                <input
+                  id="drawing-author"
+                  type="text"
+                  value={author}
+                  autoFocus
+                  onChange={(event) => {
+                    setAuthor(event.target.value);
+                    setSaveError(null);
+                  }}
+                  maxLength={40}
+                  placeholder="Your name"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-300/50"
+                />
+              </div>
+              {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setShowSaveDialog(false);
+                  setSaveError(null);
+                }}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !author.trim()}
+                className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {savedModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="doodle-saved-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setSavedModal(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl bg-white p-6 text-gray-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="doodle-saved-title" className="text-lg font-semibold">
+              Saved to the doodle wall
+            </h2>
+            <p className="mt-2 text-sm text-gray-700">
+              Signed by <span className="font-medium">{savedModal.author}</span>.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSavedModal(null)}
+                className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

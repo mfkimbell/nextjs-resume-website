@@ -8,7 +8,7 @@ import {
   Award,
   Folder,
   Briefcase,
-  Palette,      // ← added palette icon
+  Bird,
   Github,
   Download,
   Mail,
@@ -21,9 +21,10 @@ function NavIcons({ scrolled }: { scrolled: boolean }) {
   const navItems = [
     { href: "#home", Icon: Send, label: "Home" },
     { href: "#skills", Icon: Award, label: "Skills" },
+    { href: "#talk-to-the-birds", Icon: Bird, label: "Talk to the Birds" },
     { href: "#projects", Icon: Folder, label: "Projects" },
     { href: "#experience", Icon: Briefcase, label: "Experience" },
-    { href: "#metrics", Icon: Palette, label: "Canvas" },
+    { href: "#metrics", Icon: Mail, label: "Contact" },
   ];
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -81,7 +82,11 @@ function SocialIcons({ scrolled }: { scrolled: boolean }) {
   const socialItems = [
     { href: "https://github.com/mfkimbell", Icon: Github, label: "GitHub", external: true },
     { href: "/resume.pdf", Icon: Download, label: "Resume", download: true },
-    { href: "mailto:mfkimbell@gmail.com?subject=Job%20Offer", Icon: Mail, label: "Email" },
+    {
+      href: "mailto:mfkimbell@gmail.com?subject=Portfolio%20contact&body=Hi%20Michael%2C%0D%0A%0D%0AI%20saw%20your%20portfolio%20and%20wanted%20to%20reach%20out.%0D%0A%0D%0AI%20also%20left%20a%20sketch%20on%20your%20site.%0D%0A%0D%0A",
+      Icon: Mail,
+      label: "Email",
+    },
     { href: "https://www.linkedin.com/in/kimbell151/", Icon: Linkedin, label: "LinkedIn", external: true },
   ];
 

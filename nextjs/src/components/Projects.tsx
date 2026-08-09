@@ -17,8 +17,8 @@ export default function ProjectsSection() {
   const [active, setActive] = useState<Project>(projects[0]);
 
   return (
-    <section id="projects" className="sm:py-0 sm:mb-20 z-20 relative">
-      <h2 className="text-4xl font-bold neon-text text-center mb-12">
+    <section id="projects" className="py-10 sm:py-14 sm:mb-12 z-20 relative">
+      <h2 className="text-4xl font-bold neon-text text-center mb-8">
         Projects
       </h2>
 
