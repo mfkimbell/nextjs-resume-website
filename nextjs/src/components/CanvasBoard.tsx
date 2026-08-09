@@ -7,9 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import useSWR, { mutate as mutateGlobal } from "swr";
 import { Eraser, Save, Trash2, RotateCcw } from "lucide-react";
 import { SIGN_CONFIG } from "@/config/signs";
+import { drawPaintStroke, type PaintPoint } from "@/lib/paint";
 
 /* ---------- types & constants ---------- */
-type Point = { x: number; y: number };
+type Point = PaintPoint;
 type Stroke = { pts: Point[]; color: string; width: number; erase?: boolean; submissionId?: string };
 
 // Add history state type
@@ -124,8 +125,14 @@ export default function CanvasBoard({ visits, clicks, mouseMiles, embedded = fal
   }, []);
 
   /* ---------- pointer helpers ---------- */
-  const loc = (e: React.PointerEvent<HTMLCanvasElement>): Point =>
-    ({ x: (e.nativeEvent as PointerEvent).offsetX, y: (e.nativeEvent as PointerEvent).offsetY });
+  const loc = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
+    const pointer = e.nativeEvent as PointerEvent;
+    return {
+      x: pointer.offsetX,
+      y: pointer.offsetY,
+      pressure: pointer.pressure && pointer.pressure > 0 ? pointer.pressure : 0.62,
+    };
+  };
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault(); // Prevent any default touch behaviors
@@ -257,18 +264,14 @@ export default function CanvasBoard({ visits, clicks, mouseMiles, embedded = fal
     const ctx = ctxRef.current, cvs = canvasRef.current;
     if (!ctx || !cvs) return;
 
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.clearRect(0, 0, cvs.clientWidth || cvs.width, cvs.clientHeight || cvs.height);
     const base = Array.isArray(data?.strokes) ? data!.strokes : [];
 
-    [...base, ...pending].forEach(s => {
-      ctx.lineWidth = s.width;
-      ctx.strokeStyle = s.erase ? "rgba(0,0,0,1)" : s.color;
-      ctx.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
-      ctx.beginPath();
-      s.pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
+    [...base, ...pending].forEach((stroke) => {
+      drawPaintStroke(ctx, stroke);
     });
     ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
   }
 
   /* ---------- UI bits ---------- */
@@ -356,7 +359,7 @@ export default function CanvasBoard({ visits, clicks, mouseMiles, embedded = fal
         <div
           className={
             embedded
-              ? "h-full w-full mx-auto rounded-lg flex flex-col justify-center gap-2 mb-0"
+              ? "h-full w-full mx-auto rounded-lg flex flex-col justify-start gap-2 mb-0"
               : "w-full p-4 mx-auto bg-white/10 backdrop-blur-lg shadow-lg border border-white/20 rounded-xl flex flex-col gap-4 mb-0"
           }
           style={{
@@ -375,8 +378,12 @@ export default function CanvasBoard({ visits, clicks, mouseMiles, embedded = fal
               overscrollBehavior: 'none',
               position: 'relative',
               aspectRatio: `${SIGN_CONFIG.canvasWidth} / ${SIGN_CONFIG.canvasHeight}`,
+              width: embedded ? "auto" : undefined,
+              height: embedded ? "100%" : undefined,
+              maxWidth: "100%",
+              minHeight: 0,
             } as React.CSSProperties}
-            className={embedded ? "w-full bg-transparent rounded-md border-2 border-amber-900/35" : "w-full bg-transparent rounded-md border-2 border-white"}
+            className={embedded ? "min-h-0 flex-1 self-center bg-[#fffdf4] rounded-md border-2 border-amber-900/35 shadow-inner" : "w-full bg-[#fffdf4] rounded-md border-2 border-white shadow-inner"}
             onPointerDown={start}
             onPointerMove={move}
             onPointerUp={end}

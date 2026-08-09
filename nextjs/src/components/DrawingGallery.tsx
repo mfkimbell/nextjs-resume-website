@@ -5,6 +5,7 @@ import useSWR, { mutate as mutateGlobal } from "swr";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { SIGN_CONFIG } from "@/config/signs";
 import type { FooterSignsLayout } from "@/config/responsiveLayout";
+import { drawPaintStroke, type PaintPoint } from "@/lib/paint";
 
 const GALLERY_ENDPOINT = "/api/drawing-submissions";
 const PAPER_ROTATIONS = ["-rotate-2", "rotate-1", "-rotate-1"] as const;
@@ -15,7 +16,7 @@ const fetcher = (url: string) =>
     return response.json();
   });
 
-type Point = { x: number; y: number };
+type Point = PaintPoint;
 type Stroke = { pts: Point[]; color: string; width: number; erase?: boolean };
 type GalleryDrawing = {
   id: string;
@@ -64,19 +65,12 @@ function DrawingPreview({ drawing }: { drawing: GalleryDrawing }) {
       ctx.scale(scaleX, scaleY);
 
       drawing.strokes.forEach((stroke) => {
-        ctx.lineWidth = stroke.width;
-        ctx.strokeStyle = stroke.erase ? "rgba(0,0,0,1)" : stroke.color;
-        ctx.globalCompositeOperation = stroke.erase ? "destination-out" : "source-over";
-        ctx.beginPath();
-        stroke.pts.forEach((point, index) => {
-          if (index) ctx.lineTo(point.x, point.y);
-          else ctx.moveTo(point.x, point.y);
-        });
-        ctx.stroke();
+        drawPaintStroke(ctx, stroke);
       });
 
       ctx.restore();
       ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
     };
 
     redraw();

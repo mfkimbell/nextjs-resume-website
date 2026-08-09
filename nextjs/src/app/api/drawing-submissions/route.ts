@@ -28,7 +28,8 @@ function toPublicSubmission(drawing: PublicSubmission) {
   };
 }
 
-async function getVisibleSubmissions() {
+async function getVisibleSubmissions(limit = 3) {
+  const take = Math.max(1, Math.min(24, limit));
   const weekStart = getRollingWeekStart();
   const select = {
     id: true,
@@ -46,11 +47,11 @@ async function getVisibleSubmissions() {
       createdAt: { gte: weekStart },
     },
     orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
-    take: 3,
+    take,
     select,
   });
 
-  if (weekly.length === 3) return weekly.map(toPublicSubmission);
+  if (weekly.length === take) return weekly.map(toPublicSubmission);
 
   const older = await prisma.drawingSubmission.findMany({
     where: {
@@ -59,20 +60,24 @@ async function getVisibleSubmissions() {
       id: { notIn: weekly.map((drawing) => drawing.id) },
     },
     orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
-    take: 3 - weekly.length,
+    take: take - weekly.length,
     select,
   });
 
   return [...weekly, ...older].map(toPublicSubmission);
 }
 
-export async function GET() {
-  const drawings = await getVisibleSubmissions();
+export async function GET(request: NextRequest) {
+  // The bulletin board asks for more than the gallery does, so the cap is a
+  // query param now. Callers that omit it keep the original 3.
+  const raw = Number(new URL(request.url).searchParams.get("limit"));
+  const limit = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 3;
+  const drawings = await getVisibleSubmissions(limit);
 
   return NextResponse.json(
     {
       drawings,
-      limit: 3,
+      limit,
       weekWindowDays: 7,
     },
     {

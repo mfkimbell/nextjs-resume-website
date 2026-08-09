@@ -113,11 +113,11 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
         <main ref={pageContentRef} className="relative z-10 text-white">
           <div className="relative z-10">
             <TalkToTheBirds />
+            <ExperienceSection />
             <SkillsCarousel />
             <LeftBird />
             <ProjectsSection />
             <RightBird />
-            <ExperienceSection />
             <ForestFooter />
           </div>
         </main>

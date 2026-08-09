@@ -20,11 +20,11 @@ import { sectionConfigs } from "@/config/sections";
 function NavIcons({ scrolled }: { scrolled: boolean }) {
   const navItems = [
     { href: "#home", Icon: Send, label: "Home" },
-    { href: "#skills", Icon: Award, label: "Skills" },
     { href: "#talk-to-the-birds", Icon: Bird, label: "Talk to the Birds" },
-    { href: "#projects", Icon: Folder, label: "Projects" },
     { href: "#experience", Icon: Briefcase, label: "Experience" },
-    { href: "#metrics", Icon: Mail, label: "Contact" },
+    { href: "#skills", Icon: Award, label: "Skills" },
+    { href: "#projects", Icon: Folder, label: "Projects" },
+    { href: "#metrics", Icon: Mail, label: "Contact Me" },
   ];
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {

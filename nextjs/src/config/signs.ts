@@ -1,20 +1,23 @@
-// Dimensions for the doodle-wall signs and their drawing canvas.
-// Tune these values to reshape the drawing area and the sign frames.
+// Dimensions for the doodle-wall papers and their drawing canvas.
+// Tune these values to reshape the drawing area and the paper frames.
+
+export const A4_PAPER_WIDTH = 210;
+export const A4_PAPER_HEIGHT = 297;
+export const A4_PAPER_ASPECT_RATIO = A4_PAPER_WIDTH / A4_PAPER_HEIGHT;
 
 export const SIGN_CONFIG = {
   // === Drawing canvas (where users draw in CanvasBoard) ===
-  // The canvas renders at this aspect ratio. Width is the max on screen;
-  // height is derived from the ratio so mobile/desktop stay consistent.
-  canvasWidth: 480,
-  canvasHeight: 270, // 16:9 relative to canvasWidth
+  // A4 portrait ratio: 210 × 297 mm, i.e. width / height ≈ 0.707.
+  canvasWidth: A4_PAPER_WIDTH * 2,
+  canvasHeight: A4_PAPER_HEIGHT * 2,
 
   // === Paper note display (each of the 3 gallery drawings) ===
   // Max rendered width of a single paper note (in px). Height follows paper aspect.
   signMaxWidthPx: 220,
 
   // Paper note aspect ratio. These are no longer wooden sign-post PNGs.
-  signImageWidth: 4,
-  signImageHeight: 5,
+  signImageWidth: A4_PAPER_WIDTH,
+  signImageHeight: A4_PAPER_HEIGHT,
 
   // Inset of the drawing area, as % of the paper note.
   drawingInsetTopPct: 9,

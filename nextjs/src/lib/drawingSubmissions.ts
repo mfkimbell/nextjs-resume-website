@@ -1,4 +1,4 @@
-export type DrawingPoint = { x: number; y: number };
+export type DrawingPoint = { x: number; y: number; pressure?: number };
 export type DrawingStroke = {
   pts: DrawingPoint[];
   color: string;
@@ -82,9 +82,13 @@ export function sanitizeStrokes(value: unknown):
         return { ok: false, error: "Invalid point coordinates." };
       }
 
+      const pressure = Number(rawPoint.pressure);
       pts.push({
         x: Math.min(3_000, Math.max(-3_000, x)),
         y: Math.min(3_000, Math.max(-3_000, y)),
+        ...(Number.isFinite(pressure)
+          ? { pressure: Math.min(1, Math.max(0.05, pressure)) }
+          : {}),
       });
     }
 

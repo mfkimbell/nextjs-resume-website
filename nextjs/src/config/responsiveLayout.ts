@@ -16,23 +16,17 @@ export interface FooterSignsLayout {
   bottomPctBySign: readonly [number, number, number];
 }
 
-export interface FooterObjectLayout {
-  leftPct: number;
-  topPct?: number;
-  bottomPct?: number;
+export interface FooterRaccoonLayout {
+  /** Width of the raccoon as a % of the billboard width. */
   widthPct: number;
-}
-
-export interface FooterBeeLayout extends FooterObjectLayout {
-  topPct: number;
-  src: string;
-  className: string;
+  /** Optional vertical offset above the billboard's top edge, as a % of the raccoon's own height. Positive = float up, negative = sink into billboard. Defaults to 0 (raccoon's feet sit on billboard top). */
+  bottomOffsetPct?: number;
 }
 
 export interface ContactBillboardLayout {
   /** Width of the billboard as a % of the scene width. */
   widthPct: number;
-  /** Horizontal center of the billboard as a % of the scene width. */
+  /** Where the billboard center sits horizontally, as a % of viewport width (50 = viewport center). Nudge above/below 50 to visually compensate for asymmetric decorations (e.g. the left tree). */
   leftPct: number;
   /** Bottom edge of the billboard as a % of the scene height. */
   bottomPct: number;
@@ -48,16 +42,14 @@ export interface ContactBillboardLayout {
 }
 
 export interface FooterSceneLayout {
-  /** Aspect ratio used as the footer scene coordinate system. */
-  aspectRatio: string;
   /**
-   * Width of the footer scene relative to the viewport/container.
-   * Use this to make the art larger on small screens without changing its aspect ratio.
+   * Extra space below the billboard, as a % of the footer width. The grass strip
+   * lives inside this padded area. Increase this to give the grass strip more room
+   * or to push the billboard higher off the bottom of the page.
    */
-  sceneWidthPct: number;
+  bottomPaddingPct: number;
   signs: FooterSignsLayout;
-  raccoon: FooterObjectLayout;
-  bees: readonly [FooterBeeLayout, FooterBeeLayout, FooterBeeLayout];
+  raccoon: FooterRaccoonLayout;
   grass: ForegroundGrassLayout;
   billboard: ContactBillboardLayout;
 }
@@ -74,8 +66,10 @@ export interface ForegroundGrassLayout {
   heightPct: number;
   /** Optional shift up from the scene bottom, as % of the scene height. Defaults to 0. */
   bottomOffsetPct?: number;
-  /** Height of one grass tile as a % of the strip's height. Defaults to 100 (tile fills the strip vertically). Lower values = zoom out (smaller/more tiles). */
+  /** Height of the grass image as a % of the strip's height. Defaults to 100 (fills vertically). Lower values shrink the image toward the bottom of the strip. */
   tileHeightPct?: number;
+  /** Width of the grass image as a % of the strip's width. Defaults to 100 (fills horizontally). */
+  tileWidthPct?: number;
 }
 
 export interface LeftTreeLayout {
@@ -110,7 +104,7 @@ export interface ResponsiveSceneLayout {
  * are percentages of the art scene they belong to, not random viewport pixels.
  *
  * Current coverage:
- * - ForestFooter: signs, raccoon, bees, foreground grass, banner scene sizing
+ * - ForestFooter: signs, raccoon, foreground grass, banner scene sizing
  * - HomeShell: left tree page-height scale/crop
  * - DraggableWoodpecker: woodpecker anchor near the Experience section
  *
@@ -121,24 +115,18 @@ export interface ResponsiveSceneLayout {
 export const RESPONSIVE_SCENE_LAYOUT: Record<ResponsiveBreakpoint, ResponsiveSceneLayout> = {
   mobile: {
     footer: {
-      aspectRatio: "4377 / 1039",
-      sceneWidthPct: 220,
+      bottomPaddingPct: 6,
       signs: {
         widthPct: 18,
         leftPctBySign: [4, 25, 46],
         bottomPctBySign: [4, 6, 4],
       },
-      raccoon: { leftPct: 61, bottomPct: 3, widthPct: 15 },
-      bees: [
-        { src: "/animals/bee1.png", leftPct: 28, topPct: 60, widthPct: 1.5, className: "bee-anim-1" },
-        { src: "/animals/bee2.png", leftPct: 35, topPct: 38, widthPct: 1.5, className: "bee-anim-2" },
-        { src: "/animals/bee3.png", leftPct: 40, topPct: 53, widthPct: 1.5, className: "bee-anim-3" },
-      ],
+      raccoon: { widthPct: 22, bottomOffsetPct: 0 },
       grass: {
-        src: "/fauna/fauna_grass_all.png",
+        src: "/fauna/grass.png",
         widthPct: 100,
         leftPct: 0,
-        heightPct: 40,
+        heightPct: 65,
         bottomOffsetPct: 0,
       },
       billboard: {
@@ -160,24 +148,18 @@ export const RESPONSIVE_SCENE_LAYOUT: Record<ResponsiveBreakpoint, ResponsiveSce
   },
   tablet: {
     footer: {
-      aspectRatio: "4377 / 1039",
-      sceneWidthPct: 140,
+      bottomPaddingPct: 4,
       signs: {
         widthPct: 12,
         leftPctBySign: [7, 22, 37],
         bottomPctBySign: [4, 6, 4],
       },
-      raccoon: { leftPct: 58, bottomPct: 4, widthPct: 12 },
-      bees: [
-        { src: "/animals/bee1.png", leftPct: 28, topPct: 60, widthPct: 1.1, className: "bee-anim-1" },
-        { src: "/animals/bee2.png", leftPct: 35, topPct: 38, widthPct: 1.1, className: "bee-anim-2" },
-        { src: "/animals/bee3.png", leftPct: 40, topPct: 53, widthPct: 1.1, className: "bee-anim-3" },
-      ],
+      raccoon: { widthPct: 22, bottomOffsetPct: 0 },
       grass: {
-        src: "/fauna/fauna_grass_all.png",
+        src: "/fauna/grass.png",
         widthPct: 100,
-        leftPct: 100,
-        heightPct: 35,
+        leftPct: 0,
+        heightPct: 72,
         bottomOffsetPct: 0,
       },
       billboard: {
@@ -199,24 +181,18 @@ export const RESPONSIVE_SCENE_LAYOUT: Record<ResponsiveBreakpoint, ResponsiveSce
   },
   desktop: {
     footer: {
-      aspectRatio: "4377 / 1039",
-      sceneWidthPct: 100,
+      bottomPaddingPct: 3,
       signs: {
         widthPct: 9,
         leftPctBySign: [8, 21, 34],
         bottomPctBySign: [4, 6, 4],
       },
-      raccoon: { leftPct: 57, bottomPct: 5, widthPct: 10 },
-      bees: [
-        { src: "/animals/bee1.png", leftPct: 28, topPct: 60, widthPct: 1, className: "bee-anim-1" },
-        { src: "/animals/bee2.png", leftPct: 35, topPct: 38, widthPct: 1, className: "bee-anim-2" },
-        { src: "/animals/bee3.png", leftPct: 40, topPct: 53, widthPct: 1, className: "bee-anim-3" },
-      ],
+      raccoon: { widthPct: 22, bottomOffsetPct: 0 },
       grass: {
-        src: "/fauna/fauna_grass_all.png",
-        widthPct: 20,
+        src: "/fauna/grass.png",
+        widthPct: 100,
         leftPct: 0,
-        heightPct: 100,
+        heightPct: 85,
         bottomOffsetPct: 0,
       },
       billboard: {
@@ -238,24 +214,18 @@ export const RESPONSIVE_SCENE_LAYOUT: Record<ResponsiveBreakpoint, ResponsiveSce
   },
   wide: {
     footer: {
-      aspectRatio: "4377 / 1039",
-      sceneWidthPct: 100,
+      bottomPaddingPct: 3,
       signs: {
         widthPct: 8,
         leftPctBySign: [8, 20, 32],
         bottomPctBySign: [4, 6, 4],
       },
-      raccoon: { leftPct: 157, bottomPct: 15, widthPct: 19.5 },
-      bees: [
-        { src: "/animals/bee1.png", leftPct: 28, topPct: 60, widthPct: 0.9, className: "bee-anim-1" },
-        { src: "/animals/bee2.png", leftPct: 35, topPct: 38, widthPct: 0.9, className: "bee-anim-2" },
-        { src: "/animals/bee3.png", leftPct: 40, topPct: 53, widthPct: 0.9, className: "bee-anim-3" },
-      ],
+      raccoon: { widthPct: 22, bottomOffsetPct: 0 },
       grass: {
-        src: "/fauna/fauna_grass_all.png",
-        widthPct: 1000,
-        leftPct:  0,
-        heightPct: 58,
+        src: "/fauna/grass.png",
+        widthPct: 100,
+        leftPct: 0,
+        heightPct: 80,
         bottomOffsetPct: 0,
       },
       billboard: {
