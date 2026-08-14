@@ -17,7 +17,7 @@ export default function ProjectsSection() {
   const [active, setActive] = useState<Project>(projects[0]);
 
   return (
-    <section id="projects" className="py-10 sm:py-14 sm:mb-12 z-20 relative">
+    <section id="projects" className="relative z-20 pt-10 pb-24 sm:pt-14 sm:pb-32 sm:mb-12">
       <h2 className="text-4xl font-bold neon-text text-center mb-8">
         Projects
       </h2>
@@ -76,7 +76,7 @@ export default function ProjectsSection() {
         </div>
 
         {/* CONTENT PANEL */}
-        <div className="flex-1 space-y-4 mt-10 lg:mt-0 min-h-[500px] md:h-[500px]">
+        <div className="flex-1 space-y-4 mt-10 lg:mt-0 min-h-[500px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={active.name}

@@ -59,7 +59,14 @@ function mulberry32(seed: number) {
   };
 }
 
-function makePath(i: number, count: number, rand: () => number, depth: number): Path {
+function makePath(
+  i: number,
+  count: number,
+  rand: () => number,
+  depth: number,
+  scaleMin: number,
+  scaleMax: number
+): Path {
   return {
     cx: (rand() - 0.5) * 7.0,
     // biased low: the swarm should sit toward the bottom of the footer
@@ -73,7 +80,7 @@ function makePath(i: number, count: number, rand: () => number, depth: number): 
     bobA: 0.10 + rand() * 0.18,
     bobF: 1.0 + rand() * 1.5,
     z: depth + (rand() - 0.5) * 1.4,
-    scale: 0.13 + rand() * 0.11,
+    scale: scaleMin + rand() * Math.max(0, scaleMax - scaleMin),
     flapRate: 0.8 + rand() * 0.7,
     color: PALETTE[Math.floor(rand() * PALETTE.length)],
   };
@@ -226,19 +233,19 @@ function Butterfly({ path, pointer }: { path: Path; pointer: React.RefObject<THR
     let vx = -Math.sin(t) * rx + path.wobbleF * Math.cos(t * path.wobbleF) * path.wobbleA;
     let vy = Math.cos(t) * ry + path.bobF * Math.cos(t * path.bobF + 1.3) * path.bobA;
 
-    // Soft repulsion from the cursor; it also steers, so it feeds the heading.
+    // Soft attraction to the cursor; it also steers, so it feeds the heading.
     const p = pointer.current;
     if (p) {
-      const dx = x - p.x;
-      const dy = y - p.y;
+      const dx = p.x - x;
+      const dy = p.y - y;
       const d2 = dx * dx + dy * dy;
       const R = 1.55;
       if (d2 < R * R) {
         const d = Math.max(Math.sqrt(d2), 1e-4);
-        // A nudge, not a stampede - they lean away and drift back.
-        const push = (1 - d / R) * 0.62;
-        shove.current.x += ((dx / d) * push - shove.current.x) * 0.09;
-        shove.current.y += ((dy / d) * push - shove.current.y) * 0.09;
+        // A nudge, not a stampede - they lean toward the mouse and drift back.
+        const pull = (1 - d / R) * 0.62;
+        shove.current.x += ((dx / d) * pull - shove.current.x) * 0.09;
+        shove.current.y += ((dy / d) * pull - shove.current.y) * 0.09;
       }
     }
     shove.current.multiplyScalar(0.92);
@@ -293,21 +300,49 @@ function Butterfly({ path, pointer }: { path: Path; pointer: React.RefObject<THR
   );
 }
 
-function Swarm({ count, depth, seed }: { count: number; depth: number; seed: number }) {
+export function ButterflySwarm({
+  count,
+  depth,
+  seed,
+  scaleMin,
+  scaleMax,
+}: {
+  count: number;
+  depth: number;
+  seed: number;
+  scaleMin: number;
+  scaleMax: number;
+}) {
   const pointer = useRef(new THREE.Vector2(999, 999));
-  const { viewport } = useThree();
+  const { gl, viewport } = useThree();
 
-  useFrame((state) => {
-    pointer.current.set(
-      (state.pointer.x * viewport.width) / 2,
-      (state.pointer.y * viewport.height) / 2
-    );
-  });
+  useEffect(() => {
+    const updatePointer = (event: PointerEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      pointer.current.set(
+        ((event.clientX - rect.left) / rect.width - 0.5) * viewport.width,
+        -((event.clientY - rect.top) / rect.height - 0.5) * viewport.height
+      );
+    };
+
+    const clearPointer = () => pointer.current.set(999, 999);
+
+    window.addEventListener("pointermove", updatePointer, { passive: true });
+    window.addEventListener("pointerleave", clearPointer);
+    return () => {
+      window.removeEventListener("pointermove", updatePointer);
+      window.removeEventListener("pointerleave", clearPointer);
+    };
+  }, [gl, viewport.height, viewport.width]);
 
   const paths = useMemo(() => {
     const rand = mulberry32(seed);
-    return Array.from({ length: count }, (_, i) => makePath(i, count, rand, depth));
-  }, [count, depth, seed]);
+    return Array.from({ length: count }, (_, i) =>
+      makePath(i, count, rand, depth, scaleMin, scaleMax)
+    );
+  }, [count, depth, scaleMax, scaleMin, seed]);
 
   return (
     <>
@@ -322,24 +357,36 @@ export default function FooterButterflies({
   count = 10,
   depth = 0,
   seed = 1,
-  className = "",
+  scaleMin = 0.13,
+  scaleMax = 0.24,
+  className = "inset-0",
+  style,
 }: {
   count?: number;
   depth?: number;
   seed?: number;
+  scaleMin?: number;
+  scaleMax?: number;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
-    <div className={"pointer-events-none absolute inset-0 " + className} aria-hidden="true">
+    <div className={"pointer-events-none absolute " + className} style={style} aria-hidden="true">
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
         gl={{ alpha: true, antialias: true }}
-        style={{ background: "transparent" }}
+        style={{ background: "transparent", pointerEvents: "none" }}
       >
         <ambientLight intensity={2.6} />
         <directionalLight position={[2, 4, 5]} intensity={2.2} color="#fff3d6" />
         <directionalLight position={[-3, 1, 2]} intensity={1.0} color="#bfe4ff" />
-        <Swarm count={count} depth={depth} seed={seed} />
+        <ButterflySwarm
+          count={count}
+          depth={depth}
+          seed={seed}
+          scaleMin={scaleMin}
+          scaleMax={scaleMax}
+        />
       </Canvas>
     </div>
   );

@@ -17,12 +17,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function sanitizeSubmissionName(value: unknown) {
-  if (typeof value !== "string") return null;
+  if (typeof value !== "string") return "";
 
-  const trimmed = value.trim().replace(/\s+/g, " ");
-  if (!trimmed) return null;
-
-  return trimmed.slice(0, MAX_NAME_LENGTH);
+  return value.trim().replace(/\s+/g, " ").slice(0, MAX_NAME_LENGTH);
 }
 
 export function sanitizeCanvasSize(value: unknown) {

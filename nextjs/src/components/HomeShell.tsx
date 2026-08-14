@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import { SWRConfig } from "swr";
 import Header from "@/components/Header";
@@ -14,12 +14,47 @@ import TalkToTheBirds from "@/components/TalkToTheBirds";
 import DraggableWoodpecker from "@/components/DraggableWoodpecker";
 import ForestFooter from "@/components/ForestFooter";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import type { HomeSectionFrameLayout } from "@/config/responsiveLayout";
 import type { InitialGalleryResponse } from "@/lib/getInitialDrawings";
 
 const GALLERY_ENDPOINT = "/api/drawing-submissions";
+const MIN_SIDE_TREE_VISIBLE_WIDTH_PX = 24;
+const TREE_CONTENT_GAP_PX = 8;
+const FOOTER_LAYER_BASE_Z = 20;
+const FOOTER_FARTHEST_DEPTH = 12;
+const footerDepthZ = (depth: number) =>
+  FOOTER_LAYER_BASE_Z + Math.round((FOOTER_FARTHEST_DEPTH - depth) * 10);
+
+const SECTION_FRAME_JUSTIFY: Record<Required<HomeSectionFrameLayout>["align"], CSSProperties["justifyContent"]> = {
+  start: "flex-start",
+  center: "center",
+  end: "flex-end",
+};
 
 interface HomeShellProps {
   initialGallery: InitialGalleryResponse;
+}
+
+function SectionFrame({
+  children,
+  layout,
+}: {
+  children: ReactNode;
+  layout: HomeSectionFrameLayout;
+}) {
+  return (
+    <div
+      className="relative flex w-full flex-col"
+      style={{
+        minHeight: layout.minHeightPx,
+        marginTop: layout.marginTopPx,
+        marginBottom: layout.marginBottomPx,
+        justifyContent: SECTION_FRAME_JUSTIFY[layout.align ?? "start"],
+      }}
+    >
+      <div className="relative z-[90] w-full">{children}</div>
+    </div>
+  );
 }
 
 export default function HomeShell({ initialGallery }: HomeShellProps) {
@@ -34,7 +69,21 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
   const leftTreeWidthPx = leftTreeHeightPx
     ? (leftTreeHeightPx * leftTree.nativeWidthPx) / leftTree.nativeHeightPx
     : leftTree.fallbackWidthPx;
-  const leftTreeXOffsetPx = (leftTreeWidthPx * leftTree.xOffsetPctOfWidth) / 100;
+  const scaledTransparentEdgeInsetPx =
+    (leftTreeWidthPx * leftTree.transparentEdgeInsetPx) / leftTree.nativeWidthPx;
+  const sideTreeVisibleWidthPx = Math.min(
+    Math.max(
+      scaledTransparentEdgeInsetPx + leftTree.treeVisiblePeekPx,
+      MIN_SIDE_TREE_VISIBLE_WIDTH_PX
+    ),
+    leftTreeWidthPx
+  );
+  const sideTreeEdgeOffsetPx = Math.min(0, sideTreeVisibleWidthPx - leftTreeWidthPx);
+  const contentSidePaddingPx = Math.max(
+    MIN_SIDE_TREE_VISIBLE_WIDTH_PX,
+    leftTree.treeVisiblePeekPx + TREE_CONTENT_GAP_PX - leftTree.contentOverlapIntoTreePx
+  );
+  const sideTreeZIndex = footerDepthZ(layout.footer.depths.treesDepth);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true));
@@ -89,36 +138,73 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
 
         <DraggableWoodpecker />
 
-        <div
-          className="pointer-events-none absolute select-none"
-          aria-hidden="true"
-          style={{
-            top: leftTree.topOffsetPx,
-            left: leftTreeXOffsetPx,
-            width: leftTreeWidthPx,
-            height: leftTreeHeightPx || "100vh",
-            zIndex: 1000,
-          }}
-        >
-          <Image
-            src="/fauna/left_tree.png"
-            alt=""
-            fill
-            priority
-            sizes={`${Math.ceil(leftTreeWidthPx)}px`}
-            className="object-fill"
-          />
-        </div>
-
         <main ref={pageContentRef} className="relative z-10 text-white">
-          <div className="relative z-10">
-            <TalkToTheBirds />
-            <ExperienceSection />
-            <SkillsCarousel />
+          <div
+            className="pointer-events-none absolute select-none"
+            aria-hidden="true"
+            style={{
+              top: leftTree.topOffsetPx,
+              left: sideTreeEdgeOffsetPx,
+              width: leftTreeWidthPx,
+              height: leftTreeHeightPx || "100vh",
+              zIndex: sideTreeZIndex,
+            }}
+          >
+            <Image
+              src="/fauna/left_tree.png"
+              alt=""
+              fill
+              priority
+              sizes={`${Math.ceil(leftTreeWidthPx)}px`}
+              className="object-fill"
+            />
+          </div>
+
+          <div
+            className="pointer-events-none absolute select-none"
+            aria-hidden="true"
+            style={{
+              top: leftTree.topOffsetPx,
+              right: sideTreeEdgeOffsetPx,
+              width: leftTreeWidthPx,
+              height: leftTreeHeightPx || "100vh",
+              zIndex: sideTreeZIndex,
+            }}
+          >
+            <Image
+              src="/fauna/right_tree.png"
+              alt=""
+              fill
+              priority
+              sizes={`${Math.ceil(leftTreeWidthPx)}px`}
+              className="object-fill"
+            />
+          </div>
+
+          <div
+            className="relative"
+            style={{
+              paddingLeft: contentSidePaddingPx,
+              paddingRight: contentSidePaddingPx,
+            }}
+          >
+            <SectionFrame layout={layout.sections.talkToTheBirds}>
+              <TalkToTheBirds />
+            </SectionFrame>
+            <SectionFrame layout={layout.sections.experience}>
+              <ExperienceSection />
+            </SectionFrame>
             <LeftBird />
-            <ProjectsSection />
+            <SectionFrame layout={layout.sections.skills}>
+              <SkillsCarousel />
+            </SectionFrame>
             <RightBird />
-            <ForestFooter />
+            <SectionFrame layout={layout.sections.projects}>
+              <ProjectsSection />
+            </SectionFrame>
+            <SectionFrame layout={layout.sections.contact}>
+              <ForestFooter />
+            </SectionFrame>
           </div>
         </main>
 

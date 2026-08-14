@@ -81,88 +81,6 @@ export default function SkillsCarousel() {
 
   return (
     <section id="skills" className="relative py-14 z-10 overflow-visible">
-      {/* Mobile Clouds (< 768px) */}
-      <Image
-        src="/clouds/cloud1.png"
-        alt=""
-        width={80}
-        height={80}
-        priority
-        className="absolute left-[10%] top-[15%] opacity-50 pointer-events-none cloud md:hidden"
-        style={{
-          "--float-distance": "8px",
-          animationDuration: "8.5s",
-          animationDelay: "-1.2s",
-        } as React.CSSProperties}
-      />
-      <Image
-        src="/clouds/cloud3.png"
-        alt=""
-        width={60}
-        height={60}
-        priority
-        className="absolute right-[15%] top-[25%] opacity-45 pointer-events-none cloud md:hidden"
-        style={{
-          "--float-distance": "6px",
-          animationDuration: "7.8s",
-          animationDelay: "-3.5s",
-        } as React.CSSProperties}
-      />
-      <Image
-        src="/clouds/cloud5.png"
-        alt=""
-        width={70}
-        height={70}
-        priority
-        className="absolute left-[75%] top-[70%] opacity-40 pointer-events-none cloud md:hidden"
-        style={{
-          "--float-distance": "7px",
-          animationDuration: "9.2s",
-          animationDelay: "-2.8s",
-        } as React.CSSProperties}
-      />
-
-      {/* Desktop Clouds (≥ 768px) */}
-      <Image
-        src="/clouds/cloud2.png"
-        alt=""
-        width={160}
-        height={160}
-        priority
-        className="absolute left-[8%] top-[20%] opacity-60 pointer-events-none cloud hidden md:block"
-        style={{
-          "--float-distance": "15px",
-          animationDuration: "11.2s",
-          animationDelay: "-1.5s",
-        } as React.CSSProperties}
-      />
-      <Image
-        src="/clouds/cloud5.png"
-        alt=""
-        width={140}
-        height={140}
-        priority
-        className="absolute right-[12%] top-[35%] opacity-65 pointer-events-none cloud hidden md:block"
-        style={{
-          "--float-distance": "12px",
-          animationDuration: "9.8s",
-          animationDelay: "-4.2s",
-        } as React.CSSProperties}
-      />
-      <Image
-        src="/clouds/cloud3.png"
-        alt=""
-        width={120}
-        height={120}
-        priority
-        className="absolute left-[85%] top-[75%] opacity-55 pointer-events-none cloud hidden md:block"
-        style={{
-          "--float-distance": "10px",
-          animationDuration: "10.5s",
-          animationDelay: "-2.8s",
-        } as React.CSSProperties}
-      />
-
       <div className="max-w-6xl mx-auto px-4 relative z-20">
         <h2
           className="text-4xl sm:text-4xl font-bold neon-text mb-16 text-center sm:mb-20"
@@ -199,14 +117,6 @@ export default function SkillsCarousel() {
         </div>
       </div>
 
-      {/* Cloud Animation Styles */}
-      <style jsx global>{`
-        .cloud {
-          animation-name: float;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-        }
-      `}</style>
     </section>
   );
 }

@@ -1,6 +1,5 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { getRollingWeekStart } from "@/lib/drawingSubmissions";
 
 export type InitialDrawing = {
   id: string;
@@ -28,42 +27,36 @@ const SELECT = {
   createdAt: true,
 } as const;
 
+const EMPTY_INITIAL_GALLERY: InitialGalleryResponse = {
+  drawings: [],
+  limit: 3,
+  weekWindowDays: 7,
+};
+
 export async function getInitialGallery(): Promise<InitialGalleryResponse> {
-  const weekStart = getRollingWeekStart();
-
-  const weekly = await prisma.drawingSubmission.findMany({
-    where: { hidden: false, createdAt: { gte: weekStart } },
-    orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
-    take: 3,
-    select: SELECT,
-  });
-
-  let rows = weekly;
-  if (weekly.length < 3) {
-    const older = await prisma.drawingSubmission.findMany({
-      where: {
-        hidden: false,
-        createdAt: { lt: weekStart },
-        id: { notIn: weekly.map((d) => d.id) },
-      },
-      orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
-      take: 3 - weekly.length,
+  try {
+    const rows = await prisma.drawingSubmission.findMany({
+      where: { hidden: false },
+      orderBy: { createdAt: "desc" },
+      take: 3,
       select: SELECT,
     });
-    rows = [...weekly, ...older];
-  }
 
-  return {
-    drawings: rows.map((d) => ({
-      id: d.id,
-      name: d.name,
-      strokes: d.strokes,
-      canvasSize: d.canvasSize,
-      canvasHeight: d.canvasHeight,
-      upvotes: d.upvotes,
-      createdAt: d.createdAt.toISOString(),
-    })),
-    limit: 3,
-    weekWindowDays: 7,
-  };
+    return {
+      drawings: rows.map((d) => ({
+        id: d.id,
+        name: d.name,
+        strokes: d.strokes,
+        canvasSize: d.canvasSize,
+        canvasHeight: d.canvasHeight,
+        upvotes: d.upvotes,
+        createdAt: d.createdAt.toISOString(),
+      })),
+      limit: 3,
+      weekWindowDays: 7,
+    };
+  } catch (error) {
+    console.warn("[getInitialGallery] Could not load drawings; rendering empty gallery.", error);
+    return EMPTY_INITIAL_GALLERY;
+  }
 }

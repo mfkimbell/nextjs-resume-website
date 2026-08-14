@@ -9,10 +9,10 @@ interface AirplaneTrackingProps {
 }
 
 export default function AirplaneTracking({
-  className = "relative w-full h-screen overflow-hidden z-1",
+  className = "pointer-events-none relative h-screen w-full overflow-hidden z-1",
 }: AirplaneTrackingProps) {
   return (
-    <div className={className}>
+    <div className={className} aria-hidden="true">
       {/* 1) 3D scene */}
       <Canvas
         shadows

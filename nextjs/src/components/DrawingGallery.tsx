@@ -81,7 +81,7 @@ function DrawingPreview({ drawing }: { drawing: GalleryDrawing }) {
   return (
     <canvas
       ref={canvasRef}
-      aria-label={`Drawing by ${drawing.name}`}
+      aria-label="Saved drawing"
       className="block h-full w-full"
     />
   );

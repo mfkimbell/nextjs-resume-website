@@ -2,10 +2,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useSWR, { mutate as mutateGlobal } from "swr";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
+import { ThumbsUp, Trash2 } from "lucide-react";
 import * as THREE from "three";
-import { A4_PAPER_ASPECT_RATIO } from "@/config/signs";
+import { A4_PAPER_ASPECT_RATIO, BULLETIN_BOARD_CONFIG } from "@/config/signs";
 import { drawPaintStroke, fillPaperTexture, PAPER_COLOR, type PaintPoint } from "@/lib/paint";
 
 /**
@@ -40,34 +42,93 @@ function rng(seed: number) {
   };
 }
 
+type PaperSpot = { x: number; y: number; z: number; rot: number };
+
+type PaperLayout = {
+  count: number;
+  scale: number;
+  spots: PaperSpot[];
+};
+
 /**
- * Sheets are scattered, not gridded: a jittered grid keeps them from piling on
- * one spot while the per-sheet offset and rotation stop it reading as rows.
+ * Scatter drawings like someone actually pinned them by hand. This uses seeded
+ * random candidate placement instead of rows: papers spread across the whole
+ * cork area, use small hand-pinned rotations, and barely overlap when needed.
  */
-function scatter(n: number, halfW: number, yLo: number, yHi: number, cell: number, seed: number) {
-  const r = rng(seed);
-  // Cap columns so the sheets naturally form multiple vertical bands instead of
-  // one long row. The billboard is taller than it is wide, so this reads more
-  // like papers pinned across a bulletin board.
-  const maxCols = 3;
-  const availableCols = Math.max(2, Math.floor((halfW * 2) / (cell * 1.05)));
-  const cols = Math.max(2, Math.min(n, maxCols, availableCols));
-  const rows = Math.ceil(n / cols);
-  const out: { x: number; y: number; z: number; rot: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const c = i % cols;
-    const rw = Math.floor(i / cols);
-    const inRow = Math.min(cols, n - rw * cols);
-    const bx = (c - (inRow - 1) / 2) * cell * 0.92;
-    const by = yLo + ((yHi - yLo) * (rows === 1 ? 0.5 : rw / (rows - 1)));
-    out.push({
-      x: bx + (r() - 0.5) * cell * 0.55,
-      y: by + (r() - 0.5) * cell * 0.45,
-      z: i * 0.012 + r() * 0.01,
-      rot: (r() - 0.5) * 0.62,
+function layoutPapers(count: number, halfW: number, yLo: number, yHi: number): PaperLayout {
+  const requested = Math.min(count, PAPER_CONFIG.maxSheets);
+  if (requested <= 0) return { count: 0, scale: PAPER_CONFIG.maxScale, spots: [] };
+
+  const paperW = 1.04;
+  const paperH = 1.34 * PAPER_Y_SCALE;
+  const areaW = halfW * 2 * 0.88;
+  const areaH = Math.max(0.1, yHi - yLo);
+  const rand = rng(4242 + requested * 97);
+
+  // Size from a loose packing estimate, with enough breathing room that papers
+  // mostly avoid each other and only barely overlap when the board gets full.
+  const areaAspect = areaW / areaH;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(requested * areaAspect)));
+  const rows = Math.max(1, Math.ceil(requested / cols));
+  const scale = Math.max(
+    PAPER_CONFIG.minScale,
+    Math.min(
+      PAPER_CONFIG.maxScale,
+      areaW / (cols * paperW * 1.02),
+      areaH / (rows * paperH * 0.94)
+    )
+  );
+
+  const halfPaperW = (paperW * scale) / 2;
+  const halfPaperH = (paperH * scale) / 2;
+  const xLo = -areaW / 2 + halfPaperW;
+  const xHi = areaW / 2 - halfPaperW;
+  const yMin = yLo + halfPaperH;
+  const yMax = yHi - halfPaperH;
+  const pick = (lo: number, hi: number) => (hi <= lo ? (lo + hi) / 2 : lo + rand() * (hi - lo));
+  const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
+  const heightJitter = areaH * (PAPER_CONFIG.heightJitterPct / 100);
+  const maxOverlap = Math.max(0, Math.min(0.2, PAPER_CONFIG.maxOverlapPct / 100));
+  const requiredGap = 1 - maxOverlap;
+
+  const spots: PaperSpot[] = [];
+  for (let i = 0; i < requested; i++) {
+    let best = { x: pick(xLo, xHi), y: pick(yMin, yMax), score: -Infinity };
+
+    for (let attempt = 0; attempt < 180; attempt++) {
+      const x = pick(xLo, xHi);
+      const y = clamp(pick(yMin, yMax) + (rand() - 0.5) * heightJitter, yMin, yMax);
+      let overlapArea = 0;
+      let tooMuchOverlap = 0;
+      const nearest = spots.reduce((min, spot) => {
+        const dx = Math.abs((x - spot.x) / Math.max(0.001, paperW * scale));
+        const dy = Math.abs((y - spot.y) / Math.max(0.001, paperH * scale));
+        const overX = Math.max(0, 1 - dx);
+        const overY = Math.max(0, 1 - dy);
+        overlapArea += overX * overY;
+
+        // If both axes overlap past the tiny configured allowance, this is the
+        // kind of stacked-paper overlap we want to avoid unless the board is full.
+        tooMuchOverlap += Math.max(0, requiredGap - dx) * Math.max(0, requiredGap - dy);
+        return Math.min(min, Math.hypot(dx, dy));
+      }, Infinity);
+      const score =
+        Math.min(nearest, 1.45) -
+        tooMuchOverlap * 300 -
+        overlapArea * 35 +
+        rand() * 0.08;
+      if (score > best.score) best = { x, y, score };
+    }
+
+    spots.push({
+      x: best.x,
+      y: best.y,
+      z: PAPER_CONFIG.layerZ + i * PAPER_CONFIG.layerZStep,
+      rot: (rand() - 0.5) * PAPER_CONFIG.maxTiltRad,
     });
   }
-  return out;
+
+  return { count: requested, scale, spots };
 }
 const ENVELOPE = "/models/board_envelope.glb";
 const PALETTE = "/models/board_palette.glb";
@@ -99,15 +160,22 @@ const KEYCHAIN = "/models/keychain_github.glb";
  *   Steam_2 reaches 0.238 + width*0.154  -> width up to ~1.68
  * Past those it will clip through the ceramic, so raise `lift` too if you go big.
  */
-const SMOKE = [
-  { width: 1.0, height: 1.0, lift: 0, x: 0, z: 0, spin: -0.54 },
-  { width: 1.0, height: 1.0, lift: 0, x: 0, z: 0, spin: -0.75 },
-  { width: 1.0, height: 1.0, lift: 0, x: 0, z: 0, spin: -0.96 },
-] as const;
-const SMOKE_FALLBACK = { width: 1, height: 1, lift: 0, x: 0, z: 0, spin: -0.6 };
+const {
+  papers: PAPER_CONFIG,
+  objects: OBJECT_CONFIG,
+  smoke: SMOKE_CONFIG,
+} = BULLETIN_BOARD_CONFIG;
+const SHADOW_CONFIG = OBJECT_CONFIG.shadows;
 
 const GITHUB_URL = "https://github.com/mfkimbell";
 const LINKEDIN_URL = "https://www.linkedin.com/in/kimbell151/";
+const GALLERY_ENDPOINT = `/api/drawing-submissions?limit=${PAPER_CONFIG.fetchLimit}`;
+
+const fetcher = (url: string) =>
+  fetch(url, { cache: "no-store" }).then((response) => {
+    if (!response.ok) throw new Error("Could not load bulletin drawings.");
+    return response.json();
+  });
 
 type Point = PaintPoint;
 type Stroke = { pts: Point[]; color: string; width: number; erase?: boolean };
@@ -117,61 +185,48 @@ type Submission = {
   strokes: Stroke[];
   canvasSize: number;
   canvasHeight: number | null;
+  upvotes: number;
+  createdAt: string;
 };
+
+type GalleryResponse = {
+  drawings: Submission[];
+  limit: number;
+  weekWindowDays: number;
+};
+
+type VoteType = "upvote" | "downvote";
+type HoverTitleChange = (title: string, active: boolean) => void;
+
+const CONTACT_HOVER_TITLES = {
+  email: "Email Mitch",
+  sketch: "Sketch an Image",
+  github: "GitHub",
+  linkedin: "LinkedIn",
+  paper: "View a Sketch",
+} as const;
 
 const PAPER_PX = 320;
 const PAPER_HEIGHT_PX = Math.round(PAPER_PX / A4_PAPER_ASPECT_RATIO);
-// The GLB paper was authored near 1:1.3; this nudges it to true A4 portrait.
-const MODEL_PAPER_HEIGHT_RATIO = 1.3;
-const PAPER_Y_SCALE = 1 / A4_PAPER_ASPECT_RATIO / MODEL_PAPER_HEIGHT_RATIO;
-
-/**
- * A soft radial falloff used as the shadow's alpha map. The first version used a
- * flat plane with a solid colour, which rendered as visible grey RECTANGLES
- * behind every object - the boxes in the screenshot.
- */
-let shadowTex: THREE.Texture | null = null;
-function getShadowTexture(): THREE.Texture | null {
-  if (shadowTex) return shadowTex;
-  if (typeof document === "undefined") return null;
-  const n = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = n;
-  const g = c.getContext("2d");
-  if (!g) return null;
-  const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-  grad.addColorStop(0, "rgba(60,38,12,0.55)");
-  grad.addColorStop(0.55, "rgba(60,38,12,0.22)");
-  grad.addColorStop(1, "rgba(60,38,12,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, n, n);
-  shadowTex = new THREE.CanvasTexture(c);
-  shadowTex.colorSpace = THREE.SRGBColorSpace;
-  return shadowTex;
-}
+const PAPER_Y_SCALE =
+  1 / A4_PAPER_ASPECT_RATIO / PAPER_CONFIG.modelHeightRatio;
 
 function SoftShadow({
   size,
   inner,
 }: {
-  size: [number, number];
+  size: readonly [number, number];
   inner: React.RefObject<THREE.Mesh | null>;
 }) {
-  const tex = useMemo(() => getShadowTexture(), []);
-  if (!tex) return null;
-  return (
-    <mesh ref={inner} position={[0.05, -0.07, -0.03]}>
-      <planeGeometry args={[size[0] * 1.7, size[1] * 1.7]} />
-      <meshBasicMaterial
-        map={tex}
-        transparent
-        opacity={0.75}
-        depthWrite={false}
-        toneMapped={false}
-      />
-    </mesh>
-  );
+  void size;
+  void inner;
+  return null;
 }
+
+type PropShadowConfig = {
+  size: readonly [number, number];
+  offset: { x: number; y: number };
+};
 
 /** Rasterise a submitted drawing onto a paper-shaped canvas. */
 function sketchTexture(sub: Submission): THREE.Texture | null {
@@ -204,28 +259,73 @@ function sketchTexture(sub: Submission): THREE.Texture | null {
       { eraseColor: PAPER_COLOR }
     );
   }
-  g.fillStyle = "#7a5a24";
-  g.font = "700 20px ui-sans-serif, system-ui, sans-serif";
-  g.textAlign = "center";
-  g.fillText((sub.name || "anon").slice(0, 16), c.width / 2, c.height - 13);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;
   t.anisotropy = 4;
+  t.needsUpdate = true;
   return t;
 }
 
-/** Shared hover behaviour: lift toward the viewer, tilt, grow a shadow. */
-function useHoverLift(restTilt: number, lift = 0.30, tilt = -0.26) {
+/**
+ * Shared hover behaviour: the object rises and pitches forward slightly.
+ *
+ * It deliberately does NOT move toward the camera - `hoverLiftZ` is 0 in config.
+ * Z travel reads as the object swelling rather than lifting. The small negative
+ * `hoverTiltX` adds just enough forward tip to make the hover feel physical.
+ *
+ * Annotated as `number` rather than inferred: the config is `as const`, so an
+ * inferred default narrows to a literal and rejects caller overrides.
+ */
+function useHoverLift(
+  restTilt: number,
+  lift: number = BULLETIN_BOARD_CONFIG.objects.hoverLiftZ,
+  tilt: number = BULLETIN_BOARD_CONFIG.objects.hoverTiltX,
+  hideDelayMs = 0,
+  rise: number = BULLETIN_BOARD_CONFIG.objects.hoverRiseY,
+  straighten: number = BULLETIN_BOARD_CONFIG.objects.hoverStraighten
+) {
   const grp = useRef<THREE.Group>(null);
   const shadow = useRef<THREE.Mesh | null>(null);
-  const [hovered, setHovered] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hovered, setHoveredState] = useState(false);
+
+  const setHovered = useCallback(
+    (next: boolean) => {
+      if (hideTimer.current) {
+        clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+
+      if (next || hideDelayMs <= 0) {
+        setHoveredState(next);
+        document.body.style.cursor = next ? "pointer" : "";
+        return;
+      }
+
+      hideTimer.current = setTimeout(() => {
+        setHoveredState(false);
+        document.body.style.cursor = "";
+        hideTimer.current = null;
+      }, hideDelayMs);
+    },
+    [hideDelayMs]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      document.body.style.cursor = "";
+    };
+  }, []);
   useFrame((_, delta) => {
     const g = grp.current;
     if (!g) return;
     const k = 1 - Math.pow(0.0002, Math.min(delta, 0.05));
     g.position.z += ((hovered ? lift : 0) - g.position.z) * k;
+    g.position.y += ((hovered ? rise : 0) - g.position.y) * k;
     g.rotation.x += ((hovered ? tilt : 0) - g.rotation.x) * k;
-    g.rotation.z += ((hovered ? restTilt * 0.2 : restTilt) - g.rotation.z) * k;
+    g.rotation.z += ((hovered ? restTilt * straighten : restTilt) - g.rotation.z) * k;
     if (shadow.current) {
       const m = shadow.current.material as THREE.MeshBasicMaterial;
       m.opacity += ((hovered ? 0.95 : 0.5) - m.opacity) * k;
@@ -238,14 +338,12 @@ function useHoverLift(restTilt: number, lift = 0.30, tilt = -0.26) {
     onPointerOver: (e: { stopPropagation: () => void }) => {
       e.stopPropagation();
       setHovered(true);
-      document.body.style.cursor = "pointer";
     },
     onPointerOut: () => {
       setHovered(false);
-      document.body.style.cursor = "";
     },
   };
-  return { grp, shadow, hovered, bind };
+  return { grp, shadow, hovered, setHovered, bind };
 }
 
 function Prop3D({
@@ -253,31 +351,90 @@ function Prop3D({
   position,
   scale,
   restTilt,
-  shadowSize,
+  shadow: shadowConfig,
   onClick,
   bob,
   halfH,
+  hiddenNodePrefixes,
+  recenterVisible,
+  hoverTitle,
+  onHoverTitleChange,
 }: {
   url: string;
   position: [number, number, number];
   scale: number;
-  restTilt: number;
-  shadowSize: [number, number];
+  restTilt: { x: number; y: number; z: number };
+  shadow: PropShadowConfig;
   onClick?: () => void;
   bob?: number;
   /** half the model's own height, so it can sit ON the ledge rather than centred */
   halfH: number;
+  hiddenNodePrefixes?: readonly string[];
+  recenterVisible?: boolean;
+  hoverTitle?: string;
+  onHoverTitleChange?: HoverTitleChange;
 }) {
   const { scene } = useGLTF(url) as unknown as { scene: THREE.Group };
-  const obj = useMemo(() => scene.clone(true), [scene]);
-  const { grp, shadow, bind } = useHoverLift(restTilt);
+  const obj = useMemo(() => {
+    const cloned = scene.clone(true);
+
+    if (hiddenNodePrefixes?.length) {
+      cloned.traverse((child) => {
+        if (hiddenNodePrefixes.some((prefix) => child.name.startsWith(prefix))) {
+          child.visible = false;
+        }
+      });
+    }
+
+    if (recenterVisible) {
+      const box = new THREE.Box3();
+      const meshBox = new THREE.Box3();
+      const center = new THREE.Vector3();
+      cloned.updateMatrixWorld(true);
+      cloned.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.visible || !mesh.geometry) return;
+        mesh.geometry.computeBoundingBox();
+        if (!mesh.geometry.boundingBox) return;
+        meshBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+        box.union(meshBox);
+      });
+
+      if (!box.isEmpty()) {
+        box.getCenter(center);
+        cloned.position.x -= center.x;
+        cloned.position.y -= box.min.y;
+        cloned.position.z -= center.z;
+      }
+    }
+
+    cloned.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      // Steam is translucent; casting from it would only smear grey over the cup.
+      mesh.castShadow =
+        SHADOW_CONFIG.enabled && !child.name.startsWith("Steam");
+    });
+
+    return cloned;
+  }, [hiddenNodePrefixes, recenterVisible, scene]);
+  const { grp, hovered, bind } = useHoverLift(restTilt.z);
+
+  useEffect(() => {
+    if (!hoverTitle || !onHoverTitleChange) return;
+    onHoverTitleChange(hoverTitle, hovered);
+    return () => {
+      if (hovered) onHoverTitleChange(hoverTitle, false);
+    };
+  }, [hoverTitle, hovered, onHoverTitleChange]);
   const inner = useRef<THREE.Group>(null);
+  const lastClickAt = useRef(0);
   /**
    * Each node named Steam_N is a helix built around its OWN local origin and
    * displaced by a node translation, so it spins on the spot like a top - it
    * does NOT travel around the cup. A rotating helix makes its coils appear to
    * climb, which is what reads as rising smoke: no vertical motion and no
-   * opacity fade. Sizing and speed come from the SMOKE config at the top.
+   * opacity fade. Sizing and speed come from BULLETIN_BOARD_CONFIG.
    */
   const steam = useMemo(() => {
     const out: { node: THREE.Object3D; speed: number }[] = [];
@@ -286,10 +443,12 @@ function Prop3D({
       const mesh = child as THREE.Mesh;
       const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
       mat.transparent = true;
+      mat.opacity = SMOKE_CONFIG.opacity;
       mat.depthWrite = false;
+      mat.needsUpdate = true;
       mesh.material = mat;
       const n = Number(child.name.match(/Steam_(\d+)/)?.[1] ?? out.length);
-      const cfg = SMOKE[n] ?? SMOKE_FALLBACK;
+      const cfg = SMOKE_CONFIG.plumes[n] ?? SMOKE_CONFIG.fallback;
       /**
        * The helix sits above its own origin (its geometry starts at the coffee
        * surface, not at y = 0), so scaling y would drag the base up off the
@@ -322,20 +481,42 @@ function Prop3D({
     position[1] + halfH * scale,
     position[2],
   ];
+  const triggerClick = (event: { stopPropagation: () => void }) => {
+    if (!onClick) return;
+    event.stopPropagation();
+
+    const now = performance.now();
+    if (now - lastClickAt.current < 250) return;
+    lastClickAt.current = now;
+    onClick();
+  };
+
   return (
     <group position={seated}>
-      <SoftShadow size={shadowSize} inner={shadow} />
       <group
         ref={grp}
-        rotation={[0, 0, restTilt]}
+        rotation={[0, 0, restTilt.z]}
         {...(onClick ? bind : {})}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.();
-        }}
+        onClick={triggerClick}
       >
-        <group ref={inner} scale={scale}>
-          <primitive object={obj} />
+        <group rotation={[restTilt.x, restTilt.y, 0]}>
+          {onClick && (
+            <group scale={scale}>
+              <mesh position={[0, 0, 0.18]}>
+                <planeGeometry args={[shadowConfig.size[0] * 1.12, shadowConfig.size[1] * 1.12]} />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                  side={THREE.DoubleSide}
+                  toneMapped={false}
+                />
+              </mesh>
+            </group>
+          )}
+          <group ref={inner} scale={scale}>
+            <primitive object={obj} />
+          </group>
         </group>
       </group>
     </group>
@@ -347,11 +528,17 @@ function SketchPaper({
   position,
   scale,
   restTilt,
+  onVote,
+  isVoting,
+  onHoverTitleChange,
 }: {
   sub: Submission;
   position: [number, number, number];
   scale: number;
   restTilt: number;
+  onVote: (id: string, type: VoteType) => void;
+  isVoting: boolean;
+  onHoverTitleChange?: HoverTitleChange;
 }) {
   const { scene } = useGLTF(PAPER) as unknown as { scene: THREE.Group };
   const map = useMemo(() => sketchTexture(sub), [sub]);
@@ -360,13 +547,25 @@ function SketchPaper({
     if (p) {
       const mat = (p.material as THREE.MeshStandardMaterial).clone();
       if (map) mat.map = map;
+      mat.needsUpdate = true;
       mat.roughness = 0.93;
       mat.metalness = 0;
       p.material = mat;
     }
     return { p };
   }, [scene, map]);
-  const { grp, shadow, bind } = useHoverLift(restTilt, 0.26, -0.22);
+  const { grp, shadow, hovered, setHovered, bind } = useHoverLift(restTilt, undefined, undefined, 220);
+  const [controlsHovered, setControlsHovered] = useState(false);
+  const showControls = hovered || controlsHovered;
+
+  useEffect(() => {
+    if (!onHoverTitleChange) return;
+    onHoverTitleChange(CONTACT_HOVER_TITLES.paper, showControls);
+    return () => {
+      if (showControls) onHoverTitleChange(CONTACT_HOVER_TITLES.paper, false);
+    };
+  }, [onHoverTitleChange, showControls]);
+
   const paperScale: [number, number, number] = [scale, scale * PAPER_Y_SCALE, scale];
   return (
     <group position={position}>
@@ -375,67 +574,59 @@ function SketchPaper({
       </group>
       <group ref={grp} scale={paperScale} rotation={[0, 0, restTilt]} {...bind}>
         {parts.p && <primitive object={parts.p} />}
-      </group>
-    </group>
-  );
-}
-
-/** A blank aged sheet, used to fill the board when there are few submissions. */
-function blankTexture(seed: number): THREE.Texture | null {
-  if (typeof document === "undefined") return null;
-  const c = document.createElement("canvas");
-  c.width = PAPER_PX;
-  c.height = PAPER_HEIGHT_PX;
-  const g = c.getContext("2d");
-  if (!g) return null;
-  const tints = ["#fffaec", "#fdf4e0", "#fff7e6", "#f9f1dd"];
-  fillPaperTexture(g, c.width, c.height, seed + 101, tints[seed % tints.length]);
-  g.strokeStyle = "rgba(120,90,40,0.10)";
-  g.lineWidth = 1;
-  for (let y = 44; y < c.height - 20; y += 30) {
-    g.beginPath();
-    g.moveTo(20, y);
-    g.lineTo(c.width - 20, y);
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function BlankPaper({
-  position,
-  scale,
-  restTilt,
-  seed,
-}: {
-  position: [number, number, number];
-  scale: number;
-  restTilt: number;
-  seed: number;
-}) {
-  const { scene } = useGLTF(PAPER) as unknown as { scene: THREE.Group };
-  const map = useMemo(() => blankTexture(seed), [seed]);
-  const parts = useMemo(() => {
-    const pp = (scene.getObjectByName("Paper") as THREE.Mesh | undefined)?.clone();
-    if (pp) {
-      const mat = (pp.material as THREE.MeshStandardMaterial).clone();
-      if (map) mat.map = map;
-      mat.roughness = 0.94;
-      mat.metalness = 0;
-      pp.material = mat;
-    }
-    return { pp };
-  }, [scene, map]);
-  const { grp, shadow, bind } = useHoverLift(restTilt, 0.18, -0.15);
-  const paperScale: [number, number, number] = [scale, scale * PAPER_Y_SCALE, scale];
-  return (
-    <group position={position}>
-      <group scale={paperScale}>
-        <SoftShadow size={[1.04, 1.34 * PAPER_Y_SCALE]} inner={shadow} />
-      </group>
-      <group ref={grp} scale={paperScale} rotation={[0, 0, restTilt]} {...bind}>
-        {parts.pp && <primitive object={parts.pp} />}
+        {showControls && (
+          <Html
+            transform
+            position={[0, -0.43, 0.1]}
+            distanceFactor={1.45}
+            zIndexRange={[90, 40]}
+            style={{ pointerEvents: "auto" }}
+          >
+            <div
+              className="flex w-20 items-center justify-between text-amber-950"
+              onPointerEnter={() => {
+                setControlsHovered(true);
+                setHovered(true);
+              }}
+              onPointerLeave={() => {
+                setControlsHovered(false);
+                setHovered(false);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                disabled={isVoting}
+                className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full border border-amber-950/20 bg-[#fff4cf]/95 px-1.5 py-1 text-[11px] font-black shadow-md backdrop-blur-sm transition hover:bg-white disabled:opacity-45"
+                title="Upvote drawing"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onVote(sub.id, "upvote");
+                }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" strokeWidth={2.4} />
+                {sub.upvotes ?? 0}
+              </button>
+              <button
+                type="button"
+                disabled={isVoting}
+                className="pointer-events-auto inline-flex items-center rounded-full border border-red-900/20 bg-[#fff4cf]/95 p-1 text-red-800 shadow-md backdrop-blur-sm transition hover:bg-red-50 disabled:opacity-45"
+                title="Delete drawing"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onVote(sub.id, "downvote");
+                }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.4} />
+              </button>
+            </div>
+          </Html>
+        )}
       </group>
     </group>
   );
@@ -445,10 +636,16 @@ function Scene({
   subs,
   mailto,
   onSketch,
+  onVote,
+  votingId,
+  onHoverTitleChange,
 }: {
   subs: Submission[];
   mailto: string;
   onSketch: () => void;
+  onVote: (id: string, type: VoteType) => void;
+  votingId: string | null;
+  onHoverTitleChange?: HoverTitleChange;
 }) {
   const { viewport } = useThree();
   const halfW = viewport.width / 2;
@@ -458,14 +655,24 @@ function Scene({
     window.location.href = mailto;
   }, [mailto]);
 
-  // Props rest on the bottom edge; sketches fill the open bulletin space above
-  // them with a loose multi-row scatter.
-  const floorY = -halfH + 0.52;
-  const propScale = Math.min(0.72, halfW * 0.43);
-  const paperScale = Math.min(0.52, (halfW * 2) / 3.4);
-  const paperYLo = floorY + 0.98;
-  const paperYHi = halfH - paperScale * PAPER_Y_SCALE * 0.55;
-  const MIN_SHEETS = 6;
+  const paperBounds = PAPER_CONFIG.bounds;
+  const paperLeft = -halfW + viewport.width * (paperBounds.leftPct / 100);
+  const paperRight = halfW - viewport.width * (paperBounds.rightPct / 100);
+  const paperTop = halfH - viewport.height * (paperBounds.topPct / 100);
+  const paperBottom = -halfH + viewport.height * (paperBounds.bottomPct / 100);
+  const paperCenterX = (paperLeft + paperRight) / 2;
+  const paperHalfW = (paperRight - paperLeft) / 2;
+
+  // Props rest on the bottom shelf. Keep their vertical placement and base
+  // sizing tied to the full viewport as before; the frame inset is only for
+  // fitting the pinned drawings into the open board area.
+  const floorY = -halfH + OBJECT_CONFIG.shelfYFromViewportBottom;
+  const propScale = Math.min(
+    OBJECT_CONFIG.propScaleMax,
+    halfW * OBJECT_CONFIG.propScaleWidthFactor
+  );
+  const paperYLo = paperBottom;
+  const paperYHi = paperTop;
 
   /**
    * halfH is half of each model's own height in its normalised space, which is
@@ -478,82 +685,129 @@ function Scene({
       {
         key: "envelope",
         url: ENVELOPE,
-        scale: 0.82,
-        tilt: 0.05,
-        halfH: 0.33,
-        shadow: [1.0, 0.66] as [number, number],
-        bob: 0.02,
         href: undefined as string | undefined,
+        ...OBJECT_CONFIG.envelope,
       },
       {
         key: "palette",
         url: PALETTE,
-        scale: 0.90,
-        tilt: -0.07,
-        halfH: 0.5,
-        shadow: [1.05, 0.92] as [number, number],
-        bob: undefined as number | undefined,
         href: undefined as string | undefined,
+        ...OBJECT_CONFIG.palette,
       },
       {
         key: "mug",
         url: MUG,
-        scale: 0.7,
-        tilt: 0.0,
-        halfH: 0.5,
-        shadow: [1.0, 0.8] as [number, number],
-        bob: undefined as number | undefined,
         href: LINKEDIN_URL,
+        ...OBJECT_CONFIG.mug,
       },
     ],
     []
   );
-  const sheetCount = Math.max(subs.length, MIN_SHEETS);
-  const spots = useMemo(
-    () => scatter(sheetCount, halfW, paperYLo, paperYHi, paperScale * 1.12, 99),
-    [sheetCount, halfW, paperYLo, paperYHi, paperScale]
+  const paperLayout = useMemo(
+    () => layoutPapers(subs.length, paperHalfW, paperYLo, paperYHi),
+    [subs.length, paperHalfW, paperYLo, paperYHi]
   );
+  const visibleSubs = subs.slice(0, paperLayout.count);
 
   return (
     <>
       <ambientLight intensity={1.05} />
       <directionalLight position={[1.4, 2.6, 3.6]} intensity={1.55} color="#fff1d2" />
+
+      {SHADOW_CONFIG.enabled && (
+        /* Shadow-only caster: intensity 0, so it changes no shading at all, but
+           three.js still builds its shadow map and the catchers below pick it up.
+           Only this one casts - a second caster would give every prop two
+           shadows, which reads as fake immediately. */
+        <directionalLight
+          position={[
+            SHADOW_CONFIG.light.x,
+            SHADOW_CONFIG.light.y,
+            SHADOW_CONFIG.light.z,
+          ]}
+          intensity={0}
+          castShadow
+          shadow-mapSize={[SHADOW_CONFIG.mapSize, SHADOW_CONFIG.mapSize]}
+          shadow-bias={SHADOW_CONFIG.bias}
+          shadow-normalBias={SHADOW_CONFIG.normalBias}
+          shadow-camera-near={SHADOW_CONFIG.cameraNear}
+          shadow-camera-far={SHADOW_CONFIG.cameraFar}
+          shadow-camera-left={-SHADOW_CONFIG.cameraExtent}
+          shadow-camera-right={SHADOW_CONFIG.cameraExtent}
+          shadow-camera-top={SHADOW_CONFIG.cameraExtent}
+          shadow-camera-bottom={-SHADOW_CONFIG.cameraExtent}
+        />
+      )}
       <directionalLight position={[-2.4, -0.4, 2.2]} intensity={0.45} color="#b9d4f0" />
 
-      {spots.map((sp, i) =>
-        i < subs.length ? (
-          <SketchPaper
-            key={subs[i].id}
-            sub={subs[i]}
-            position={[sp.x, sp.y, sp.z]}
-            scale={paperScale}
-            restTilt={sp.rot}
-          />
-        ) : (
-          <BlankPaper
-            key={"blank" + i}
-            position={[sp.x, sp.y, sp.z]}
-            scale={paperScale}
-            restTilt={sp.rot}
-            seed={i}
-          />
-        )
+
+      {SHADOW_CONFIG.enabled && (
+        <>
+          {/* Shadow catchers. ShadowMaterial renders ONLY what is shadowed, so
+              these planes stay invisible over the board art except where a prop
+              blocks the caster. Flat one grounds the props on the shelf; upright
+              one throws the softer shadow back onto the board. */}
+          <mesh
+            receiveShadow
+            renderOrder={4}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[
+              0,
+              floorY + SHADOW_CONFIG.shelfYLift,
+              OBJECT_CONFIG.layerZ + SHADOW_CONFIG.shelfZOffset,
+            ]}
+          >
+            <planeGeometry
+              args={[halfW * SHADOW_CONFIG.shelfWidthFactor, SHADOW_CONFIG.shelfDepth]}
+            />
+            <shadowMaterial transparent depthWrite={false} opacity={SHADOW_CONFIG.shelfOpacity} />
+          </mesh>
+          <mesh
+            receiveShadow
+            renderOrder={5}
+            position={[0, floorY + SHADOW_CONFIG.boardYOffset, SHADOW_CONFIG.boardZ]}
+          >
+            <planeGeometry
+              args={[halfW * SHADOW_CONFIG.boardWidthFactor, SHADOW_CONFIG.boardHeight]}
+            />
+            <shadowMaterial transparent depthWrite={false} opacity={SHADOW_CONFIG.boardOpacity} />
+          </mesh>
+        </>
       )}
+      {visibleSubs.map((sub, i) => {
+        const sp = paperLayout.spots[i];
+        if (!sp) return null;
+        return (
+          <SketchPaper
+            key={sub.id}
+            sub={sub}
+            position={[paperCenterX + sp.x, sp.y, sp.z]}
+            scale={paperLayout.scale}
+            restTilt={sp.rot}
+            onVote={onVote}
+            isVoting={votingId === sub.id}
+          />
+        );
+      })}
 
       {/* Props stand on the shelf along the bottom of the board. Each is
           offset up by half its OWN height (halfH) so it rests on the shelf line
           instead of being centred on it - the artwork behind supplies the shelf. */}
       {SHELF.map((item, i) => {
-        const span = halfW * 1.30;
+        const span = halfW * OBJECT_CONFIG.shelfSpanFactor;
         const x = -span / 2 + (i * span) / (SHELF.length - 1);
         return (
           <Prop3D
             key={item.key}
             url={item.url}
-            position={[x, floorY, 0.1]}
+            position={[
+              x + item.offset.x,
+              floorY + item.offset.y,
+              OBJECT_CONFIG.layerZ + item.offset.z,
+            ]}
             scale={propScale * item.scale}
             restTilt={item.tilt}
-            shadowSize={item.shadow}
+            shadow={item.shadow}
             halfH={item.halfH}
             bob={item.bob}
             onClick={
@@ -567,21 +821,26 @@ function Scene({
         );
       })}
 
-      {/* The GitHub keychain lies on its side on the shelf, chain trailing to the
-          right. This model is exported with its base already at z = 0 rather than
-          centred, so halfH is 0 and it rests exactly on the shelf line. It sits at a
-          higher z than the standing props so the chain drapes in front of them. */}
+      {/* The GitHub mark uses the keychain GLB with the chain/ring nodes hidden,
+          then recenters the visible logo so it stands on its bottom edge. */}
       <Prop3D
         url={KEYCHAIN}
-        position={[-halfW * 0.06, floorY, 0.45]}
-        scale={propScale * 1.15}
-        restTilt={0}
-        shadowSize={[1.15, 0.34]}
-        halfH={0}
+        position={[
+          -halfW * 0.06 + OBJECT_CONFIG.keychain.offset.x,
+          floorY + OBJECT_CONFIG.keychain.offset.y,
+          OBJECT_CONFIG.frontLayerZ + OBJECT_CONFIG.keychain.offset.z,
+        ]}
+        scale={propScale * OBJECT_CONFIG.keychain.scale}
+        restTilt={OBJECT_CONFIG.keychain.tilt}
+        shadow={OBJECT_CONFIG.keychain.shadow}
+        halfH={OBJECT_CONFIG.keychain.halfH}
+        hiddenNodePrefixes={OBJECT_CONFIG.keychain.hiddenNodePrefixes}
+        recenterVisible={OBJECT_CONFIG.keychain.recenterVisible}
         onClick={() =>
           window.open(GITHUB_URL, "_blank", "noopener,noreferrer")
         }
       />
+
     </>
   );
 }
@@ -589,32 +848,85 @@ function Scene({
 export default function BulletinBoard({
   mailto,
   onSketch,
+  onHoverTitleChange,
   className = "",
 }: {
   mailto: string;
   onSketch: () => void;
+  onHoverTitleChange?: HoverTitleChange;
   className?: string;
 }) {
-  const [subs, setSubs] = useState<Submission[]>([]);
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/drawing-submissions?limit=8", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!alive || !d) return;
-        const list: Submission[] = Array.isArray(d) ? d : d.drawings ?? [];
-        setSubs(list.slice(0, 8));
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const { data, mutate } = useSWR<GalleryResponse>(GALLERY_ENDPOINT, fetcher, {
+    refreshInterval: 5_000,
+  });
+  const [votingId, setVotingId] = useState<string | null>(null);
+  const subs = data?.drawings ?? [];
+
+  const vote = useCallback(
+    async (id: string, type: VoteType) => {
+      if (votingId) return;
+
+      setVotingId(id);
+
+      if (type === "upvote") {
+        void mutate(
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  drawings: current.drawings.map((drawing) =>
+                    drawing.id === id
+                      ? { ...drawing, upvotes: (drawing.upvotes ?? 0) + 1 }
+                      : drawing
+                  ),
+                }
+              : current,
+          false
+        );
+      } else {
+        void mutate(
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  drawings: current.drawings.filter((drawing) => drawing.id !== id),
+                }
+              : current,
+          false
+        );
+        void mutateGlobal("/api/drawings");
+      }
+
+      try {
+        const response = await fetch(`/api/drawing-submissions/${id}/${type}`, {
+          method: "POST",
+        });
+        if (!response.ok) throw new Error("Vote failed.");
+        await mutate();
+      } catch {
+        await mutate();
+      } finally {
+        setVotingId(null);
+      }
+    },
+    [mutate, votingId]
+  );
 
   return (
     <div className={"absolute inset-0 " + className}>
-      <Canvas camera={{ position: [0, 0, 4.2], fov: 42 }} gl={{ alpha: true, antialias: true }}>
-        <Scene subs={subs} mailto={mailto} onSketch={onSketch} />
+      <Canvas
+        shadows={SHADOW_CONFIG.enabled}
+        camera={{ position: [0, 0, 4.2], fov: 42 }}
+        gl={{ alpha: true, antialias: true }}
+      >
+        <Scene
+          subs={subs}
+          mailto={mailto}
+          onSketch={onSketch}
+          onVote={vote}
+          votingId={votingId}
+          onHoverTitleChange={onHoverTitleChange}
+        />
       </Canvas>
       <div className="sr-only">
         <a href={mailto}>Email Mitch</a>

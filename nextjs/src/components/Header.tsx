@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Send,
   Award,
   Folder,
   Briefcase,
@@ -19,7 +18,6 @@ import { sectionConfigs } from "@/config/sections";
 // ——— NavIcons sub‑component ———
 function NavIcons({ scrolled }: { scrolled: boolean }) {
   const navItems = [
-    { href: "#home", Icon: Send, label: "Home" },
     { href: "#talk-to-the-birds", Icon: Bird, label: "Talk to the Birds" },
     { href: "#experience", Icon: Briefcase, label: "Experience" },
     { href: "#skills", Icon: Award, label: "Skills" },
@@ -29,12 +27,6 @@ function NavIcons({ scrolled }: { scrolled: boolean }) {
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-
-    // If the user clicked the paper-airplane ("Home") icon, just scroll to the very top
-    if (href === "#home") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
 
     const targetId = href.replace('#', '');
     const element = document.getElementById(targetId);
