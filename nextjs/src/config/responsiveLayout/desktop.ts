@@ -30,7 +30,7 @@ export const DESKTOP_SCENE_LAYOUT: ResponsiveSceneLayout = {
   leftTree: {
     ...SIDE_TREE_SHARED,
     // ─── Tune these two ───────────────────────────
-    treeVisiblePeekPx: 96,
+    treeVisiblePeekPx: 126,
     contentOverlapIntoTreePx: 72,
     // ──────────────────────────────────────────────
   },

@@ -30,8 +30,8 @@ export const MOBILE_SCENE_LAYOUT: ResponsiveSceneLayout = {
   leftTree: {
     ...SIDE_TREE_SHARED,
     // ─── Tune these two ───────────────────────────
-    treeVisiblePeekPx: 96,
-    contentOverlapIntoTreePx: 72,
+    treeVisiblePeekPx: 126,
+    contentOverlapIntoTreePx: 92,
     // ──────────────────────────────────────────────
   },
   woodpecker: { ...WOODPECKER_DEFAULT },

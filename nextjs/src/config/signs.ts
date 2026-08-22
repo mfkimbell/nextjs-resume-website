@@ -109,9 +109,9 @@ export const BULLETIN_BOARD_CONFIG = {
      * SHADOWS - everything here is live-tunable, nothing is hardcoded.
      * ------------------------------------------------------------------
      * The board art is a PNG behind a transparent canvas, so there is no 3D
-     * shelf to catch anything. Two invisible ShadowMaterial planes stand in for
-     * it: ShadowMaterial draws nothing except the shadow falling on it, so it
-     * composites straight over your artwork.
+     * shelf to catch anything. One invisible ShadowMaterial plane stands in for
+     * the shelf/contact surface: ShadowMaterial draws nothing except the shadow
+     * falling on it, so it composites straight over your artwork.
      */
     shadows: {
       /** Master switch. false = no casting, no catchers, no shadow map cost. */
@@ -131,9 +131,8 @@ export const BULLETIN_BOARD_CONFIG = {
        */
 light: { x: 0.2, y: 1.8, z: 3 },
 
-      /** How dark. This is the "boldness" dial. */
+      /** How dark. This is the contact-shadow "boldness" dial. */
       shelfOpacity: 0.16,
-      boardOpacity: 0.07,
 
       /**
        * Flat catcher lying on the shelf line - the contact shadow that grounds
@@ -145,12 +144,6 @@ light: { x: 0.2, y: 1.8, z: 3 },
       shelfDepth: 1.7,
       shelfYLift: 0.07,
       shelfZOffset: -0.25,
-
-      /** Upright catcher on the board face - the softer cast behind the props. */
-      boardWidthFactor: 2.4,
-      boardHeight: 2.6,
-      boardYOffset: 1.55,
-      boardZ: 0.02,
 
       /**
        * Shadow map quality. `mapSize` is resolution (512 blocky / 2048 crisp).

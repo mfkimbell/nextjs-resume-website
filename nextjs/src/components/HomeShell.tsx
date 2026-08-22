@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import Image from "next/image";
 import { SWRConfig } from "swr";
 import Header from "@/components/Header";
 import LeftBird from "@/components/LeftBird";
@@ -38,9 +37,12 @@ interface HomeShellProps {
 function SectionFrame({
   children,
   layout,
+  contentZIndex = 90,
 }: {
   children: ReactNode;
   layout: HomeSectionFrameLayout;
+  /** Use "auto" when child z-indexes need to interleave with page decorations. */
+  contentZIndex?: number | "auto";
 }) {
   return (
     <div
@@ -52,7 +54,12 @@ function SectionFrame({
         justifyContent: SECTION_FRAME_JUSTIFY[layout.align ?? "start"],
       }}
     >
-      <div className="relative z-[90] w-full">{children}</div>
+      <div
+        className="relative w-full"
+        style={{ zIndex: contentZIndex === "auto" ? undefined : contentZIndex }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -60,28 +67,36 @@ function SectionFrame({
 export default function HomeShell({ initialGallery }: HomeShellProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [pageHeightPx, setPageHeightPx] = useState(0);
+  const [viewportHeightPx, setViewportHeightPx] = useState(0);
   const pageContentRef = useRef<HTMLElement>(null);
   const { layout } = useResponsiveLayout();
   const leftTree = layout.leftTree;
   const leftTreeHeightPx = pageHeightPx
     ? Math.max(0, pageHeightPx - leftTree.topOffsetPx - leftTree.bottomOffsetPx)
     : 0;
-  const leftTreeWidthPx = leftTreeHeightPx
-    ? (leftTreeHeightPx * leftTree.nativeWidthPx) / leftTree.nativeHeightPx
+  const renderedSideTreeHeightPx = leftTreeHeightPx || viewportHeightPx;
+  const leftTreeWidthPx = renderedSideTreeHeightPx
+    ? Math.round((renderedSideTreeHeightPx * leftTree.nativeWidthPx) / leftTree.nativeHeightPx)
     : leftTree.fallbackWidthPx;
   const scaledTransparentEdgeInsetPx =
     (leftTreeWidthPx * leftTree.transparentEdgeInsetPx) / leftTree.nativeWidthPx;
-  const sideTreeVisibleWidthPx = Math.min(
-    Math.max(
-      scaledTransparentEdgeInsetPx + leftTree.treeVisiblePeekPx,
-      MIN_SIDE_TREE_VISIBLE_WIDTH_PX
-    ),
-    leftTreeWidthPx
+  const sideTreeVisibleWidthPx = Math.round(
+    Math.min(
+      Math.max(
+        scaledTransparentEdgeInsetPx + leftTree.treeVisiblePeekPx,
+        MIN_SIDE_TREE_VISIBLE_WIDTH_PX
+      ),
+      leftTreeWidthPx
+    )
   );
-  const sideTreeEdgeOffsetPx = Math.min(0, sideTreeVisibleWidthPx - leftTreeWidthPx);
-  const contentSidePaddingPx = Math.max(
-    MIN_SIDE_TREE_VISIBLE_WIDTH_PX,
-    leftTree.treeVisiblePeekPx + TREE_CONTENT_GAP_PX - leftTree.contentOverlapIntoTreePx
+  const sideTreeEdgeOffsetPx = Math.round(
+    Math.min(0, sideTreeVisibleWidthPx - leftTreeWidthPx)
+  );
+  const contentSidePaddingPx = Math.round(
+    Math.max(
+      MIN_SIDE_TREE_VISIBLE_WIDTH_PX,
+      leftTree.treeVisiblePeekPx + TREE_CONTENT_GAP_PX - leftTree.contentOverlapIntoTreePx
+    )
   );
   const sideTreeZIndex = footerDepthZ(layout.footer.depths.treesDepth);
 
@@ -92,6 +107,7 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
 
   useEffect(() => {
     const updateTreeHeight = () => {
+      setViewportHeightPx(window.innerHeight);
       if (!pageContentRef.current) return;
       setPageHeightPx(Math.ceil(pageContentRef.current.getBoundingClientRect().height));
     };
@@ -146,17 +162,19 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
               top: leftTree.topOffsetPx,
               left: sideTreeEdgeOffsetPx,
               width: leftTreeWidthPx,
-              height: leftTreeHeightPx || "100vh",
+              height: renderedSideTreeHeightPx || "100vh",
               zIndex: sideTreeZIndex,
+              overflow: "hidden",
             }}
           >
-            <Image
+            <img
               src="/fauna/left_tree.png"
               alt=""
-              fill
-              priority
-              sizes={`${Math.ceil(leftTreeWidthPx)}px`}
-              className="object-fill"
+              aria-hidden="true"
+              width={leftTree.nativeWidthPx}
+              height={leftTree.nativeHeightPx}
+              draggable={false}
+              className="h-full w-full select-none object-fill"
             />
           </div>
 
@@ -167,17 +185,19 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
               top: leftTree.topOffsetPx,
               right: sideTreeEdgeOffsetPx,
               width: leftTreeWidthPx,
-              height: leftTreeHeightPx || "100vh",
+              height: renderedSideTreeHeightPx || "100vh",
               zIndex: sideTreeZIndex,
+              overflow: "hidden",
             }}
           >
-            <Image
-              src="/fauna/right_tree.png"
+            <img
+              src="/fauna/right_tree.png?v=6"
               alt=""
-              fill
-              priority
-              sizes={`${Math.ceil(leftTreeWidthPx)}px`}
-              className="object-fill"
+              aria-hidden="true"
+              width={leftTree.nativeWidthPx}
+              height={leftTree.nativeHeightPx}
+              draggable={false}
+              className="h-full w-full select-none object-fill"
             />
           </div>
 
@@ -202,7 +222,7 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
             <SectionFrame layout={layout.sections.projects}>
               <ProjectsSection />
             </SectionFrame>
-            <SectionFrame layout={layout.sections.contact}>
+            <SectionFrame layout={layout.sections.contact} contentZIndex="auto">
               <ForestFooter />
             </SectionFrame>
           </div>
@@ -213,6 +233,7 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
             0%, 100% { transform: translateY(0); }
             50%      { transform: translateY(-6px); }
           }
+
         `}</style>
       </div>
     </SWRConfig>

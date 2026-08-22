@@ -21,10 +21,13 @@ const FOOTER_GRASS_LAYER_SOURCES = [
   { src: "/fauna/13.png", depth: 13 },
 ] as const;
 
-export const footerGrassLayers = (heightPct: number): FooterGrassLayerLayout[] =>
+export const footerGrassLayers = (
+  heightPct: number,
+  widthPct: number = 100
+): FooterGrassLayerLayout[] =>
   FOOTER_GRASS_LAYER_SOURCES.map((layer) => ({
     ...layer,
-    widthPct: 100,
+    widthPct,
     heightPct,
     bottomOffsetPct: 0,
     tileWidthPct: 100,
@@ -33,10 +36,10 @@ export const footerGrassLayers = (heightPct: number): FooterGrassLayerLayout[] =
 
 export const FOOTER_DEPTHS: FooterDepthLayout = {
   // 1 is the closest/front grass layer; higher numbers are farther back.
-  // The grass now runs 1..13, so ~7 is visually the middle of the stack.
-  // Decrease to bring forward; increase to tuck deeper into the grass.
-  treesDepth: 5.5,
-  billboardDepth: 1.5,
+  // Put the side trees exactly between grass layer 6 and grass layer 7.
+  // footerDepthZ(6) = 80, footerDepthZ(6.5) = 75, footerDepthZ(7) = 70.
+  treesDepth: 6.5,
+  billboardDepth: 2.5,
   raccoonDepth: 5.5,
 };
 

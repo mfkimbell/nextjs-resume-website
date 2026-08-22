@@ -50,6 +50,19 @@
     to   { transform: rotateY(360deg); }
   }
   .spin-slow { animation: spin-slow 20s linear infinite; }
+
+  /* Footer peek animation: an animal periodically slides out from behind an
+     occluder (e.g. the bulletin board) and back. The `--peek-translate`
+     variable carries the offset for the peeked pose; timing % is fixed to
+     roughly (hidden 54%, slide-out 14%, hold 20%, slide-back 12%) which
+     matches the default FooterAnimalPeek in config/footerAnimals.ts. */
+  @keyframes footer-peek {
+      0%   { transform: translateX(0); }
+     54%   { transform: translateX(0); }
+     68%   { transform: translateX(var(--peek-translate, -100%)); }
+     88%   { transform: translateX(var(--peek-translate, -100%)); }
+    100%   { transform: translateX(0); }
+  }
 }
 
 /*─────────────────────────────────────────────────────────────*/

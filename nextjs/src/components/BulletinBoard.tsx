@@ -742,37 +742,25 @@ function Scene({
 
 
       {SHADOW_CONFIG.enabled && (
-        <>
-          {/* Shadow catchers. ShadowMaterial renders ONLY what is shadowed, so
-              these planes stay invisible over the board art except where a prop
-              blocks the caster. Flat one grounds the props on the shelf; upright
-              one throws the softer shadow back onto the board. */}
-          <mesh
-            receiveShadow
-            renderOrder={4}
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[
-              0,
-              floorY + SHADOW_CONFIG.shelfYLift,
-              OBJECT_CONFIG.layerZ + SHADOW_CONFIG.shelfZOffset,
-            ]}
-          >
-            <planeGeometry
-              args={[halfW * SHADOW_CONFIG.shelfWidthFactor, SHADOW_CONFIG.shelfDepth]}
-            />
-            <shadowMaterial transparent depthWrite={false} opacity={SHADOW_CONFIG.shelfOpacity} />
-          </mesh>
-          <mesh
-            receiveShadow
-            renderOrder={5}
-            position={[0, floorY + SHADOW_CONFIG.boardYOffset, SHADOW_CONFIG.boardZ]}
-          >
-            <planeGeometry
-              args={[halfW * SHADOW_CONFIG.boardWidthFactor, SHADOW_CONFIG.boardHeight]}
-            />
-            <shadowMaterial transparent depthWrite={false} opacity={SHADOW_CONFIG.boardOpacity} />
-          </mesh>
-        </>
+        /* Single contact-shadow catcher. ShadowMaterial renders ONLY what is
+           shadowed, so this plane stays invisible over the board art except
+           where a prop blocks the caster. The old upright board-face catcher
+           was removed because it created a second, misaligned shadow. */
+        <mesh
+          receiveShadow
+          renderOrder={4}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[
+            0,
+            floorY + SHADOW_CONFIG.shelfYLift,
+            OBJECT_CONFIG.layerZ + SHADOW_CONFIG.shelfZOffset,
+          ]}
+        >
+          <planeGeometry
+            args={[halfW * SHADOW_CONFIG.shelfWidthFactor, SHADOW_CONFIG.shelfDepth]}
+          />
+          <shadowMaterial transparent depthWrite={false} opacity={SHADOW_CONFIG.shelfOpacity} />
+        </mesh>
       )}
       {visibleSubs.map((sub, i) => {
         const sp = paperLayout.spots[i];
