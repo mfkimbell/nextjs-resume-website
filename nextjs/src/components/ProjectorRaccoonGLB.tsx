@@ -90,8 +90,8 @@ export default function ProjectorRaccoonGLB({ archSrc }: Props) {
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((m) => m.clone())
         : mesh.material.clone();

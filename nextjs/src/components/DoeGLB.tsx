@@ -20,8 +20,8 @@ export default function DoeGLB() {
     cloned.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
     });
     return cloned;
   }, [source]);

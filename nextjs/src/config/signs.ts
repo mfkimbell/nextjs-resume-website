@@ -204,6 +204,53 @@ light: { x: 0.2, y: 1.8, z: 3 },
       hiddenNodePrefixes: [],
       recenterVisible: true,
     },
+    /**
+     * Raccoons walking along the TOP beam of the board.
+     *
+     * They use board_racoon.glb, NOT racoon.glb. The raw asset is a Sketchfab
+     * export — 5.6 units long, sitting off its own origin, and carrying stray
+     * Light/Camera/RootNode empties. board_racoon.glb is that model normalised
+     * to the same convention every other board prop follows: centred on X/Z,
+     * feet at y = 0, exactly 1.0 tall. Hence halfH 0.5.
+     *
+     * Purely decorative — no click target, and Prop3D is told not to bind
+     * pointer handlers so they never show a pointer cursor.
+     */
+    racoons: {
+      /**
+       * Top edge of the wooden beam, as a fraction of the board image height.
+       * Measured off /signs/contactme.png's alpha channel: the wood's first
+       * opaque row is y = 44 of 2504. The raccoons' feet sit on this line.
+       * Re-measure if that PNG is ever re-exported.
+       */
+      beamTopFrac: 0.0176,
+      /** Bottom of that beam, where the cream panel starts: y = 274 of 2504. */
+      beamBottomFrac: 0.1094,
+      /**
+       * Raccoon height as a MULTIPLE OF THE BEAM's height, not a share of
+       * propScale. propScale is capped at 0.72, so a fixed scale would leave
+       * them 0.59x the beam on a small board and 0.34x on a large one — they
+       * would visibly shrink relative to the thing they stand on as the board
+       * grew. Measuring against the beam keeps them consistent at every
+       * breakpoint. 1.15 = slightly taller than the beam is thick.
+       */
+      heightVsBeam: 1.15,
+      /** board_racoon.glb is normalised to exactly 1.0 tall. */
+      halfH: 0.5,
+      /** No contact shadow: the shadow catcher lives down at the shelf. */
+      shadow: { size: [0, 0], offset: { x: 0, y: 0 } },
+      /**
+       * One entry per raccoon. `x` is a fraction of HALF the board width, so
+       * -1 is the far left edge and +1 the far right. `faceLeft` mirrors the
+       * model (it is sculpted nose-toward +X). Vary `scale` and `bob` a little
+       * or the row reads as three copies of one raccoon.
+       */
+      spots: [
+        { x: -0.58, faceLeft: false, scale: 1.0, tilt: { x: 0, z: 0.03 }, bob: 0.012 },
+        { x: 0.04, faceLeft: true, scale: 0.86, tilt: { x: 0, z: -0.04 }, bob: 0.017 },
+        { x: 0.62, faceLeft: false, scale: 0.93, tilt: { x: 0, z: 0.02 }, bob: 0.009 },
+      ],
+    },
   },
   smoke: {
     opacity: 0.52,

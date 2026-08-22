@@ -3,6 +3,7 @@
 
 import type { CSSProperties } from "react";
 import { Canvas } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
 import DoeGLB from "./DoeGLB";
 
 export default function DoeScene({
@@ -19,12 +20,15 @@ export default function DoeScene({
       aria-hidden="true"
     >
       <Canvas
+        dpr={[1, 2]}
         camera={{ position: [0, 0.45, 5], fov: 34 }}
         gl={{ alpha: true, antialias: true }}
       >
-        <ambientLight intensity={1.35} />
-        <directionalLight position={[3, 4, 5]} intensity={2.25} color="#fff2cf" />
-        <directionalLight position={[-3, 1, 2]} intensity={0.55} color="#b9d4f0" />
+        <Environment preset="forest" environmentIntensity={0.55} />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[3, 4, 5]} intensity={1.9} color="#fff2cf" />
+        <directionalLight position={[-3, 1, 2]} intensity={0.7} color="#b9d4f0" />
+        <directionalLight position={[0, 3, -6]} intensity={0.4} color="#ffffff" />
         <DoeGLB />
       </Canvas>
     </div>

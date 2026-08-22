@@ -282,20 +282,6 @@ export default function ForestFooter() {
           </div>
         </div>
 
-        <Image
-          src="/gifs/racoon.gif"
-          alt=""
-          width={1000}
-          height={1000}
-          unoptimized
-          className="pointer-events-none absolute left-1/2 h-auto -translate-x-1/2"
-          style={{
-            bottom: `calc(100% + ${footer.raccoon.bottomOffsetPct ?? 0}%)`,
-            width: `${footer.raccoon.widthPct}%`,
-            zIndex: footerDepthZ(footer.depths.raccoonDepth),
-          }}
-        />
-
         {FOOTER_ANIMALS.filter(
           (animal) => animal.enabled && !("fullFooter" in animal && animal.fullFooter)
         ).map((animal) => {

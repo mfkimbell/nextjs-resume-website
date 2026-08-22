@@ -12,7 +12,11 @@ function getPageRelativeTop(element: HTMLElement) {
   return element.getBoundingClientRect().top + window.scrollY;
 }
 
-export default function DraggableWoodpecker() {
+interface DraggableWoodpeckerProps {
+  side?: "left" | "right";
+}
+
+export default function DraggableWoodpecker({ side = "left" }: DraggableWoodpeckerProps) {
   const { layout } = useResponsiveLayout();
   const woodpecker = layout.woodpecker;
   const [anchor, setAnchor] = useState<Anchor>({
@@ -61,13 +65,16 @@ export default function DraggableWoodpecker() {
     woodpecker.xPx,
   ]);
 
+  const isRight = side === "right";
+
   return (
     <div
       className="pointer-events-none absolute z-[1100] select-none"
       style={{
-        left: anchor.x,
+        [isRight ? "right" : "left"]: anchor.x,
         top: anchor.y,
         opacity: anchor.ready ? 1 : 0,
+        transform: isRight ? "scaleX(-1)" : undefined,
       }}
       aria-hidden="true"
     >

@@ -134,6 +134,8 @@ const ENVELOPE = "/models/board_envelope.glb";
 const PALETTE = "/models/board_palette.glb";
 const MUG = "/models/mug_linkedin.glb";
 const KEYCHAIN = "/models/keychain_github.glb";
+// Normalised in Blender from racoon.glb — see BULLETIN_BOARD_CONFIG.objects.racoons.
+const RACCOON = "/models/board_racoon.glb";
 
 /**
  * ---------------------------------------------------------------------------
@@ -829,6 +831,36 @@ function Scene({
         }
       />
 
+
+      {/* Raccoons along the TOP beam of the board. Their feet sit on the beam's
+          top edge, measured off the contactme.png artwork rather than guessed —
+          see racoons.beamTopFrac. They are sized against the BEAM rather than
+          propScale, which is capped and would let them drift relative to it.
+          Passing no onClick is what keeps them
+          decorative: Prop3D only binds pointer handlers when a handler exists,
+          so they never take a hover lift or a pointer cursor. */}
+      {OBJECT_CONFIG.racoons.spots.map((sp, i) => (
+        <Prop3D
+          key={`racoon-${i}`}
+          url={RACCOON}
+          position={[
+            sp.x * halfW,
+            halfH - viewport.height * OBJECT_CONFIG.racoons.beamTopFrac,
+            OBJECT_CONFIG.frontLayerZ,
+          ]}
+          scale={
+            viewport.height *
+            (OBJECT_CONFIG.racoons.beamBottomFrac - OBJECT_CONFIG.racoons.beamTopFrac) *
+            OBJECT_CONFIG.racoons.heightVsBeam *
+            sp.scale
+          }
+          restTilt={{ x: sp.tilt.x, y: sp.faceLeft ? Math.PI : 0, z: sp.tilt.z }}
+          shadow={OBJECT_CONFIG.racoons.shadow}
+          halfH={OBJECT_CONFIG.racoons.halfH}
+          bob={sp.bob}
+        />
+      ))}
+
     </>
   );
 }
@@ -933,3 +965,4 @@ useGLTF.preload(ENVELOPE);
 useGLTF.preload(PALETTE);
 useGLTF.preload(MUG);
 useGLTF.preload(KEYCHAIN);
+useGLTF.preload(RACCOON);

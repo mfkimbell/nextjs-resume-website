@@ -6,6 +6,7 @@
 
 import React, { Suspense, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import ProjectorRaccoonGLB from "./ProjectorRaccoonGLB";
 
@@ -49,11 +50,19 @@ function ProjectorRaccoonScene({ archSrc, className }: Props) {
         "w-full h-[260px] sm:h-[360px] md:h-[440px] lg:h-[520px] pointer-events-none"
       }
     >
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 9], fov: 40 }}>
+      <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0, 9], fov: 40 }}>
         <FitCamera />
-        <ambientLight intensity={1.2} />
-        <directionalLight position={[3, 5, 4]} intensity={1.5} color="#fff3d6" />
-        <directionalLight position={[-4, 3, 2]} intensity={0.45} color="#bcd9ff" />
+        <Environment preset="apartment" environmentIntensity={0.5} />
+        <ambientLight intensity={0.3} />
+        <directionalLight
+          position={[3, 5, 4]}
+          intensity={1.6}
+          color="#fff3d6"
+          castShadow
+          shadow-mapSize={[1024, 1024]}
+        />
+        <directionalLight position={[-4, 3, 2]} intensity={0.5} color="#bcd9ff" />
+        <directionalLight position={[0, 3, -6]} intensity={0.4} color="#ffffff" />
         <Suspense fallback={null}>
           <ProjectorRaccoonGLB archSrc={archSrc} />
         </Suspense>

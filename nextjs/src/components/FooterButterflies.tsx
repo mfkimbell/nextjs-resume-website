@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, Environment } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import * as THREE from "three";
 
@@ -377,9 +377,11 @@ export default function FooterButterflies({
         gl={{ alpha: true, antialias: true }}
         style={{ background: "transparent", pointerEvents: "none" }}
       >
-        <ambientLight intensity={2.6} />
-        <directionalLight position={[2, 4, 5]} intensity={2.2} color="#fff3d6" />
-        <directionalLight position={[-3, 1, 2]} intensity={1.0} color="#bfe4ff" />
+        <Environment preset="park" environmentIntensity={0.5} />
+        <ambientLight intensity={0.35} />
+        <directionalLight position={[2, 4, 5]} intensity={1.8} color="#fff3d6" />
+        <directionalLight position={[-3, 1, 2]} intensity={0.7} color="#bfe4ff" />
+        <directionalLight position={[0, 3, -6]} intensity={0.4} color="#ffffff" />
         <ButterflySwarm
           count={count}
           depth={depth}

@@ -3,7 +3,7 @@
 
 import React, { useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment } from "@react-three/drei";
 import ParrotGLB from "./ParrotGLB";
 
 export default function ParrotScene() {
@@ -14,9 +14,12 @@ export default function ParrotScene() {
       ref={containerRef}
       className="w-[260px] h-[260px] sm:w-[300px] sm:h-[300px] pointer-events-none"
     >
-      <Canvas camera={{ position: [0, 0.6, 3], fov: 40 }}>
-        <ambientLight intensity={2.6} />
-        <directionalLight position={[5, 10, 5]} intensity={3.2} color="#7fcfff" />
+      <Canvas dpr={[1, 2]} camera={{ position: [0, 0.6, 3], fov: 40 }}>
+        <Environment preset="city" environmentIntensity={0.6} />
+        <ambientLight intensity={0.35} />
+        <directionalLight position={[5, 10, 5]} intensity={2.4} color="#fff2d6" />
+        <directionalLight position={[-6, 4, -3]} intensity={0.9} color="#7fcfff" />
+        <directionalLight position={[0, 3, -6]} intensity={0.5} color="#ffffff" />
         <ParrotGLB containerRef={containerRef} />
         <OrbitControls enableZoom={false} enablePan={false} />
       </Canvas>

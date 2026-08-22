@@ -152,7 +152,8 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
 
         <Header />
 
-        <DraggableWoodpecker />
+        <DraggableWoodpecker side="left" />
+        <DraggableWoodpecker side="right" />
 
         <main ref={pageContentRef} className="relative z-10 text-white">
           <div
@@ -186,7 +187,11 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
               right: sideTreeEdgeOffsetPx,
               width: leftTreeWidthPx,
               height: renderedSideTreeHeightPx || "100vh",
-              zIndex: sideTreeZIndex,
+              // Right tree sits BEHIND the skills carousel birds so they can
+              // fly out in front of it. Left tree stays above (birds enter
+              // from behind it). If you need it back in front, restore
+              // `sideTreeZIndex` and lift SkillsCarousel's contentZIndex.
+              zIndex: 30,
               overflow: "hidden",
             }}
           >
@@ -215,7 +220,7 @@ export default function HomeShell({ initialGallery }: HomeShellProps) {
               <ExperienceSection />
             </SectionFrame>
             <LeftBird />
-            <SectionFrame layout={layout.sections.skills}>
+            <SectionFrame layout={layout.sections.skills} contentZIndex={40}>
               <SkillsCarousel />
             </SectionFrame>
             <RightBird />
