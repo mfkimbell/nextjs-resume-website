@@ -1,9 +1,7 @@
-import HomeShell from "@/components/HomeShell";
-import { getInitialGallery } from "@/lib/getInitialDrawings";
+import CampsiteHome from "@/components/CampsiteHome";
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  const initialGallery = await getInitialGallery();
-  return <HomeShell initialGallery={initialGallery} />;
+// The campsite is the site now. The previous HomeShell/gallery entry point is left in
+// place under src/components, so this is a one-line revert if it's ever wanted back.
+export default function Home() {
+  return <CampsiteHome />;
 }
