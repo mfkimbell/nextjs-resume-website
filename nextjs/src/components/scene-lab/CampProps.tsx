@@ -474,18 +474,41 @@ function useGifTexture(url: string | undefined, width = 256, height = 192) {
  * by a scanline overlay and a coloured point light thrown forward — the same
  * three ingredients that make the code-built CrtTv read as switched ON.
  */
+/** Optional light-controls passed by a caller to shape the CRT's forward
+ *  throw. All fields optional — defaults produce a wide, screen-hot spot. */
+export interface CrtLightConfig {
+  /** How far forward (in local +Z, past the screen face) the spot sits. */
+  forwardOffset?: number;
+  /** Cone half-angle in radians. Wider = spills more sideways. */
+  angle?: number;
+  /** Soft edge, 0..1. 0 = hard cone, 1 = fully feathered. */
+  penumbra?: number;
+  /** Max reach of the throw in world units. */
+  distance?: number;
+  /** Distance falloff exponent (Three default is 2). */
+  decay?: number;
+  /** Multiplier layered on top of the screen glow — 1 = matches the previous
+   *  point light output. Set 0 to cut this CRT's contribution entirely. */
+  intensityScale?: number;
+  /** Local-space nudge of the light source relative to the screen center. */
+  offsetX?: number;
+  offsetY?: number;
+}
+
 export function RetroCrtTv({
   position = [0, 0, 0],
   rotationY = 0,
   scale = 1,
   screen = {},
   seed = 0,
+  light: lightCfg = {},
 }: {
   position?: [number, number, number];
   rotationY?: number;
   scale?: number;
   screen?: CrtScreen;
   seed?: number;
+  light?: CrtLightConfig;
 }) {
   const tint = screen.tint ?? "#8be8ff";
   const glow = screen.glow ?? 1;
@@ -509,14 +532,43 @@ export function RetroCrtTv({
   const gifTex = useGifTexture(screen.content);
   const scanlines = useScanlines();
 
-  const light = useRef<THREE.PointLight>(null);
+  // Light shape: forward-firing spot (not a point). A point light lit
+  // everything around the TV including the wall behind it; the spot's cone
+  // confines the throw to the front. Caller can widen the cone, push the
+  // source further out, or dim it entirely via `light={...}`.
+  const forwardOffset = lightCfg.forwardOffset ?? 0.35;
+  const angle = lightCfg.angle ?? Math.PI / 3;      // 60° half-angle default
+  const penumbra = lightCfg.penumbra ?? 0.5;
+  const distance = lightCfg.distance ?? 3.4;
+  const decay = lightCfg.decay ?? 2;
+  const intensityScale = lightCfg.intensityScale ?? 1;
+  const offsetX = lightCfg.offsetX ?? 0;
+  const offsetY = lightCfg.offsetY ?? 0;
+
+  const lightRef = useRef<THREE.SpotLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+  // Wire the spot's target so it points down +Z (out through the screen face).
+  // Without an explicit target, three defaults it to (0,0,0), which for a
+  // light in front of the TV would beam back INTO the chassis.
+  useEffect(() => {
+    if (lightRef.current && targetRef.current) {
+      lightRef.current.target = targetRef.current;
+      lightRef.current.target.updateMatrixWorld();
+    }
+  }, []);
+
   useFrame(({ clock }) => {
     const t = clock.elapsedTime + seed * 3.1;
     // mains hum: a small, fast flicker so the throw never sits perfectly still
-    if (light.current) {
-      light.current.intensity = glow * (2.4 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 27.7) * 0.09);
+    if (lightRef.current) {
+      lightRef.current.intensity = intensityScale * glow *
+        (2.4 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 27.7) * 0.09);
     }
   });
+
+  const lightX = SCREEN_CENTER[0] + offsetX;
+  const lightY = SCREEN_CENTER[1] + offsetY;
+  const lightZ = SCREEN_CENTER[2] + forwardOffset;
 
   return (
     <group position={position} rotation={[0, rotationY, 0]} scale={scale} name="crt">
@@ -542,15 +594,21 @@ export function RetroCrtTv({
           toneMapped={false}
         />
       </mesh>
-      {/* tint glow, so the CRT actually paints its surroundings */}
-      <pointLight
-        ref={light}
-        position={[SCREEN_CENTER[0], SCREEN_CENTER[1], SCREEN_CENTER[2] + 0.35]}
+      {/* Forward-firing spot: only lights what's IN FRONT of the screen. */}
+      <spotLight
+        ref={lightRef}
+        position={[lightX, lightY, lightZ]}
         color={tint}
-        intensity={2.4 * glow}
-        distance={3.4}
-        decay={2}
+        intensity={2.4 * glow * intensityScale}
+        distance={distance}
+        decay={decay}
+        angle={angle}
+        penumbra={penumbra}
       />
+      {/* Target the light points AT. Placed ~1.5 units further forward than the
+       *  light itself, so the cone shoots down local +Z. Any farther is fine —
+       *  spotLights use the target only for a direction vector. */}
+      <object3D ref={targetRef} position={[lightX, lightY, lightZ + 1.5]} />
     </group>
   );
 }

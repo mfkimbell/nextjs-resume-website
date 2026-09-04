@@ -18,6 +18,7 @@ function clampUnit(v: number) {
 
 const STORAGE_KEY = "scene-lab-config-v1";
 const MODE_KEY = "campsite-mode";
+const MUTE_KEY = "campsite-muted";
 
 type Mode = "config" | "site";
 
@@ -41,6 +42,7 @@ export default function CampsiteHome() {
   const [mode, setMode] = useState<Mode>("config");
   const [panel, setPanel] = useState(0);
   const [config, setConfig] = useState<CampfireSceneConfig>(DEFAULT_CAMPFIRE_CONFIG);
+  const [muted, setMuted] = useState(false);
   // Title screen gate for site mode. Fresh every time you enter preview - the
   // cinematic is part of the vibe, so returning visitors see it too.
   const [showTitle, setShowTitle] = useState(true);
@@ -57,10 +59,25 @@ export default function CampsiteHome() {
       window.localStorage.removeItem(STORAGE_KEY);
       const savedMode = window.localStorage.getItem(MODE_KEY);
       if (savedMode === "site" || savedMode === "config") setMode(savedMode);
+      const savedMuted = window.localStorage.getItem(MUTE_KEY);
+      if (savedMuted === "1") setMuted(true);
     } catch {
       /* defaults are fine */
     }
   }, []);
+
+  const toggleMuted = useCallback(() => {
+    setMuted((m) => {
+      const next = !m;
+      try { window.localStorage.setItem(MUTE_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  // Effective config: force masterVolume to 0 when muted, so every downstream
+  // sound (fire crackle, banjo, swoosh, hover) is silenced without touching
+  // the individual per-sound sliders.
+  const effectiveConfig = muted ? { ...config, masterVolume: 0 } : config;
 
   const toggleMode = useCallback(() => {
     setMode((m) => {
@@ -79,11 +96,11 @@ export default function CampsiteHome() {
   useEffect(() => {
     if (lastPanelRef.current !== panel) {
       lastPanelRef.current = panel;
-      const master = clampUnit(config.masterVolume);
-      const vol = master * clampUnit(config.swooshVolume);
+      const master = clampUnit(effectiveConfig.masterVolume);
+      const vol = master * clampUnit(effectiveConfig.swooshVolume);
       if (vol > 0) playSwoosh(vol);
     }
-  }, [panel, config.masterVolume, config.swooshVolume, playSwoosh]);
+  }, [panel, effectiveConfig.masterVolume, effectiveConfig.swooshVolume, playSwoosh]);
 
   const next = useCallback(() => setPanel((p) => (p + 1) % PANELS.length), []);
   const prev = useCallback(() => setPanel((p) => (p - 1 + PANELS.length) % PANELS.length), []);
@@ -108,6 +125,27 @@ export default function CampsiteHome() {
     </button>
   );
 
+  const MuteToggle = (
+    <button
+      onClick={toggleMuted}
+      aria-label={muted ? "Unmute" : "Mute"}
+      title={muted ? "Unmute" : "Mute"}
+      className="pointer-events-auto fixed bottom-3 right-3 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/70 shadow-lg backdrop-blur-md transition hover:border-white/35 hover:text-white"
+    >
+      {muted ? (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+          <path d="M11 5 6 9H3v6h3l5 4V5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="m16 9 5 6M21 9l-5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+          <path d="M11 5 6 9H3v6h3l5 4V5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
+  );
+
   // Config mode is the scene lab itself - no duplicated controls, no drift between
   // what's tuned here and what the site renders.
   if (mode === "config") {
@@ -123,7 +161,7 @@ export default function CampsiteHome() {
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-[#03040a]">
-      <CampfireScene config={config} panel={panel} intro titleHeld={titleHeld} />
+      <CampfireScene config={effectiveConfig} panel={panel} intro titleHeld={titleHeld} />
 
       {showTitle ? (
         <CampsiteTitleIntro
@@ -177,6 +215,7 @@ export default function CampsiteHome() {
       )}
 
       {ModeToggle}
+      {MuteToggle}
     </main>
   );
 }

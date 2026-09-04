@@ -13,6 +13,16 @@ export const metadata: Metadata = {
   title: "Mitchell Kimbell",
   description: "Portfolio and interactive resume",
   metadataBase: new URL("https://mitchellkimbell.com"),
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "180x180" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
   openGraph: {
     title: "Mitchell Kimbell",
     description: "Software Engineer Portfolio",
